@@ -5,7 +5,9 @@ from psycopg2.extras import RealDictCursor
 from flask_cors import CORS
 
 # Initialize Flask without a default static folder
-app = Flask(__name__, static_folder=None)
+app = Flask(__name__, 
+            static_folder='static/landing', 
+            static_url_path='')
 CORS(app)
 
 # Environment Variables
