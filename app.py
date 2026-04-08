@@ -1,44 +1,32 @@
 import os
-import psycopg2
-from flask import Flask, render_template, request, jsonify, send_from_directory
-from psycopg2.extras import RealDictCursor
+from flask import Flask, render_template, send_from_directory
 from flask_cors import CORS
 
-# Initialize Flask without a default static folder
-app = Flask(__name__, 
-            static_folder='static/landing', 
-            static_url_path='')
+# Initialize Flask pointing to the landing subfolder
+app = Flask(__name__, static_folder='static/landing', static_url_path='')
 CORS(app)
 
-# Environment Variables
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-DATABASE_URL = os.getenv('DATABASE_URL')
-
-# Get the absolute path to the current directory
+# Use absolute paths to prevent Vercel environment confusion
 BASE_DIR = os.getcwd()
-
-def get_db_connection():
-    return psycopg2.connect(DATABASE_URL)
-
-# --- FRONTEND ROUTES ---
 
 @app.route("/")
 def serve_landing():
-    # This must point to the folder containing your React index.html
+    """Serves index.html from static/landing/"""
     return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/assets/<path:path>')
 def serve_assets(path):
-    """Maps /assets/ requests to the physical static/landing/assets/ folder."""
-    return send_from_directory('static/landing/assets', path)
+    """Serves JS/CSS from static/landing/assets/"""
+    return send_from_directory(os.path.join(app.static_folder, 'assets'), path)
 
 @app.route("/map")
 def serve_map():
-    return render_template("index.html", google_api_key=GOOGLE_API_KEY)
+    """Serves map app using the template in /templates/"""
+    return render_template("index.html", google_api_key=os.getenv("GOOGLE_API_KEY"))
 
 @app.route('/static/<path:filename>')
 def serve_icons(filename):
-    """Handles icons (mini, point, etc.) sitting in the static folder"""
+    """Serves icons sitting directly in /static/ (cursor, mini, point)"""
     return send_from_directory(os.path.join(BASE_DIR, 'static'), filename)
 
 # --- API ROUTES ---
