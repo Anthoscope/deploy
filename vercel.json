@@ -1,11 +1,31 @@
 {
   "version": 2,
   "builds": [
-    { "src": "app.py", "use": "@vercel/python" }
+    {
+      "src": "app.py",
+      "use": "@vercel/python"
+    }
   ],
   "routes": [
-    { "handle": "filesystem" },
-    { "src": "/assets/(.*)", "dest": "/static/landing/assets/$1" },
-    { "src": "/(.*)", "dest": "app.py" }
+    {
+      "src": "/assets/(.*)",
+      "dest": "/static/landing/assets/$1"
+    },
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/map",
+      "dest": "app.py"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "app.py"
+    },
+    {
+      "src": "/",
+      "dest": "/static/landing/index.html"
+    }
   ]
 }
