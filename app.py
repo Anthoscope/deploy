@@ -31,12 +31,8 @@ def serve_map():
 
 @app.route('/assets/<path:path>')
 def serve_assets(path):
-    """
-    Serves everything inside static/landing/assets.
-    Whether the file is named 'index.js' or 'index-123.js', 
-    this route will find it and send it to the browser.
-    """
-    return send_from_directory(os.path.join(app.static_folder, 'assets'), path)
+    # This must match where your index.js and index.css actually sit in GitHub
+    return send_from_directory('static/landing/assets', path)
 
 # --- API ROUTES ---
 
