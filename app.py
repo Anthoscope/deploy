@@ -4,12 +4,16 @@ from flask import Flask, render_template, request, jsonify, send_from_directory
 from psycopg2.extras import RealDictCursor
 from flask_cors import CORS
 
-# Initialize without a default static folder to avoid path conflicts
+# Initialize Flask without a default static folder
 app = Flask(__name__, static_folder=None)
 CORS(app)
 
-DATABASE_URL = os.getenv('DATABASE_URL')
+# Environment Variables
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+# Get the absolute path to the current directory
+BASE_DIR = os.getcwd()
 
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL)
@@ -18,28 +22,23 @@ def get_db_connection():
 
 @app.route("/")
 def serve_landing():
-    """Serves index.html and should bring back your tab icon"""
-    return send_from_directory('static/landing', 'index.html')
+    """Explicitly send index.html from static/landing"""
+    return send_from_directory(os.path.join(BASE_DIR, 'static', 'landing'), 'index.html')
 
 @app.route('/assets/<path:path>')
 def serve_assets(path):
-    """Serves the React JS/CSS files"""
-    return send_from_directory('static/landing/assets', path)
+    """Explicitly send React assets"""
+    return send_from_directory(os.path.join(BASE_DIR, 'static', 'landing', 'assets'), path)
 
 @app.route("/map")
 def serve_map():
-    """Serves the Jinja2 Map page"""
     return render_template("index.html", google_api_key=GOOGLE_API_KEY)
 
 @app.route('/static/<path:filename>')
-@app.route('/<path:filename>') # Catch-all for icons sitting in the root of static
-def serve_static_files(filename):
-    """
-    Handles icons like mini, point, cursor.
-    If the browser asks for /mini or /static/mini, this finds it.
-    """
-    # First check the root of 'static'
-    return send_from_directory('static', filename)
+def serve_icons(filename):
+    """Handles icons (mini, point, etc.) sitting in the static folder"""
+    return send_from_directory(os.path.join(BASE_DIR, 'static'), filename)
+
 # --- API ROUTES ---
 
 @app.route("/api/reviews", methods=['POST'])
