@@ -22,8 +22,8 @@ def get_db_connection():
 
 @app.route("/")
 def serve_landing():
-    """Explicitly send index.html from static/landing"""
-    return send_from_directory(os.path.join(BASE_DIR, 'static', 'landing'), 'index.html')
+    # This must point to the folder containing your React index.html
+    return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/assets/<path:path>')
 def serve_assets(path):
