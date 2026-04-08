@@ -12,16 +12,10 @@ CORS(app) # Enables Cross-Origin Resource Sharing
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "key")
 
 # Database configuration (Unchanged)
-DB_CONFIG = {
-    'dbname': os.getenv('DB_NAME', 'pollen_db'),
-    'user': os.getenv('DB_USER', 'postgres'),
-    'password': os.getenv('DB_PASSWORD', 'postgres'),
-    'host': os.getenv('DB_HOST', 'localhost'),
-    'port': os.getenv('DB_PORT', '5432')
-}
+DATABASE_URL = os.getenv('DATABASE_URL')
 
 def get_db_connection():
-    return psycopg2.connect(**DB_CONFIG)
+    return psycopg2.connect(DATABASE_URL)
 
 # --- FRONTEND ROUTES ---
 
