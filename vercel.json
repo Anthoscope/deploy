@@ -9,6 +9,7 @@
   "routes": [
     { "src": "/assets/(.*)", "dest": "/static/landing/assets/$1" },
     { "src": "/static/(.*)", "dest": "/static/$1" },
+    { "src": "/favicon.ico", "dest": "/static/landing/favicon.ico" },
     { "src": "/(.*)", "dest": "app.py" }
   ]
 }
