@@ -6,14 +6,9 @@
       "use": "@vercel/python"
     }
   ],
+  
   "routes": [
-    {
-      "src": "/assets/(.*)",
-      "dest": "/static/landing/assets/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "app.py"
-    }
+    { "src": "/assets/(.*)", "dest": "/static/landing/assets/$1" },
+    { "src": "/(.*)", "dest": "app.py" }
   ]
 }
