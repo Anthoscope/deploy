@@ -3,18 +3,19 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
-from flask_cors import CORS # Added to help React talk to Flask during dev/prod
+from flask_cors import CORS
 
-app = Flask(__name__, static_folder='static')
-CORS(app) # Enables Cross-Origin Resource Sharing
+# 1. Tell Flask the static folder is inside static/landing
+app = Flask(__name__, static_folder='static/landing', static_url_path='')
+CORS(app)
 
-# Load Google API key
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "key")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
-# Database configuration (Unchanged)
+# 2. Use the Neon Connection String (Pooled)
 DATABASE_URL = os.getenv('DATABASE_URL')
 
 def get_db_connection():
+    # Connect using the single string from Vercel Env Vars
     return psycopg2.connect(DATABASE_URL)
 
 # --- FRONTEND ROUTES ---
@@ -22,20 +23,19 @@ def get_db_connection():
 @app.route("/")
 def serve_landing():
     """Serves the React Landing Page from static/landing"""
-    return send_from_directory('static/landing', 'index.html')
+    return send_from_directory(app.static_folder, 'index.html')
 
 @app.route("/map")
 def serve_map():
     """Serves the original Map page from templates"""
     return render_template("index.html", google_api_key=GOOGLE_API_KEY)
 
-# CRITICAL: This route ensures React's CSS/JS assets are found correctly
+# 3. CRITICAL: Serve React's JS and CSS bundles
 @app.route('/assets/<path:path>')
 def serve_assets(path):
-    return send_from_directory('static/landing/assets', path)
+    return send_from_directory(os.path.join(app.static_folder, 'assets'), path)
 
-
-# --- API ROUTES (Unchanged) ---
+# --- API ROUTES (Keep these as they were) ---
 
 @app.route("/api/reviews", methods=['POST'])
 def create_review():
@@ -66,17 +66,10 @@ def get_reviews():
     try:
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("""
-            SELECT id, center_lat, center_lng, radius_km, pollen_type, 
-                   severity, symptoms, review_text, created_at
-            FROM allergy_reviews ORDER BY created_at DESC LIMIT 100
-        """)
+        cur.execute("SELECT * FROM allergy_reviews ORDER BY created_at DESC LIMIT 100")
         reviews = cur.fetchall()
         cur.close()
         conn.close()
         return jsonify({'success': True, 'reviews': reviews}), 200
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
-
-#if __name__ == "__main__":
-#    app.run(debug=True)
