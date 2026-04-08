@@ -1,13 +1,8 @@
 import os
-from flask import Flask, render_template, send_from_directory
-from flask_cors import CORS
+from flask import Flask, send_from_directory
 
-# Initialize Flask pointing to the landing subfolder
+# Tell Flask the default static root is the landing folder
 app = Flask(__name__, static_folder='static/landing', static_url_path='')
-CORS(app)
-
-# Use absolute paths to prevent Vercel environment confusion
-BASE_DIR = os.getcwd()
 
 @app.route("/")
 def serve_landing():
@@ -16,8 +11,16 @@ def serve_landing():
 
 @app.route('/assets/<path:path>')
 def serve_assets(path):
-    """Serves JS/CSS from static/landing/assets/"""
+    """
+    Explicitly serves files from static/landing/assets/.
+    This is what fixes the 404 for index.js and index.css.
+    """
     return send_from_directory(os.path.join(app.static_folder, 'assets'), path)
+
+@app.route('/images/<path:path>')
+def serve_images(path):
+    """Explicitly serves files from static/landing/images/."""
+    return send_from_directory(os.path.join(app.static_folder, 'images'), path)
 
 @app.route("/map")
 def serve_map():
