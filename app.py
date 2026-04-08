@@ -27,8 +27,8 @@ def serve_landing():
 
 @app.route('/assets/<path:path>')
 def serve_assets(path):
-    """Explicitly send React assets"""
-    return send_from_directory(os.path.join(BASE_DIR, 'static', 'landing', 'assets'), path)
+    """Maps /assets/ requests to the physical static/landing/assets/ folder."""
+    return send_from_directory('static/landing/assets', path)
 
 @app.route("/map")
 def serve_map():
