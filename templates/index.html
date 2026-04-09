@@ -172,7 +172,27 @@
       box-shadow: 0 0 0 2px var(--pink);
       color: var(--pink);
     }
-
+/* ── Hint ── */
+    .hint {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 25, 35, 0.8);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 10px 24px;
+      border-radius: 30px;
+      border: 1px solid var(--border);
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--pink);
+      z-index: 1000;
+      pointer-events: none;
+      letter-spacing: 0.5px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      animation: fadeIn 0.5s ease;
+    }
     /* ── Review modal ── */
     #review-modal {
       display: none;
@@ -297,6 +317,8 @@
     <h2 id="report-loc">LOCAL POLLEN DATA</h2>
     <div id="pollen-list"></div>
   </div>
+
+  <div class="hint">📍 Tap anywhere on the map to inspect local pollen levels</div>
 
   <!-- <button id="drawAreaBtn">Draw Area &amp; Review</button> -->
 
