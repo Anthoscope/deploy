@@ -22,7 +22,7 @@ def serve_assets(path):
 @app.route("/map")
 def serve_map():
     """Serves map app using the template in /templates/"""
-    return render_template("index.html", google_api_key=os.getenv("GOOGLE_API_KEY"))
+    return render_template("index.html")
 
 @app.route('/static/<path:filename>')
 def serve_icons(filename):
