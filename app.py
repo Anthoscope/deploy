@@ -47,15 +47,19 @@ def create_review():
         conn = get_db_connection()
         cur = conn.cursor()
 
+        # Only insert the three fields the frontend actually sends.
+        # pollen_type and severity are not sent by the map form, so
+        # they are omitted here to avoid NOT-NULL constraint errors.
         cur.execute("""
             INSERT INTO allergy_reviews
-            (center_lat, center_lng, radius_km, pollen_type, severity, symptoms, review_text)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                (center_lat, center_lng, radius_km, review_text)
+            VALUES (%s, %s, %s, %s)
             RETURNING id, created_at
         """, (
-            data['centerLat'], data['centerLng'], data['radiusKm'],
-            data.get('pollenType', None), data.get('severity', None),
-            data.get('symptoms', []), data.get('reviewText', '')
+            data['centerLat'],
+            data['centerLng'],
+            data['radiusKm'],
+            data.get('reviewText', '')
         ))
 
         result = cur.fetchone()
