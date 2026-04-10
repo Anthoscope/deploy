@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Anthoscope</title>
 
-  <link rel="shortcut icon" href="{{ url_for('static', filename='anthologo-neg.ico') }}">
-  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='anthologo-neg.ico') }}">
+  <link rel="shortcut icon" href="{{ url_for('static', filename='anthoscope-logo1.ico') }}">
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='anthoscope-logo1.ico') }}">
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -172,7 +172,8 @@
       box-shadow: 0 0 0 2px var(--pink);
       color: var(--pink);
     }
-/* ── Hint ── */
+
+    /* ── Hint ── */
     .hint {
       position: absolute;
       bottom: 30px;
@@ -193,6 +194,7 @@
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
       animation: fadeIn 0.5s ease;
     }
+
     /* ── Review modal ── */
     #review-modal {
       display: none;
@@ -308,11 +310,11 @@
 </head>
 <body>
 
-  <!-- Logo
+  <!-- Logo -->
   <div id="logo-container">
-    <img src="{{ url_for('static', filename='anthologo-neg.png') }}" alt="Anthoscope">
+    <img src="{{ url_for('static', filename='landing/images/anthologo_neg.png') }}" alt="Anthoscope">
   </div>
-  -->
+
   <div id="pollen-report" class="glass-card">
     <h2 id="report-loc">LOCAL POLLEN DATA</h2>
     <div id="pollen-list"></div>
@@ -320,7 +322,7 @@
 
   <div class="hint">📍 Tap anywhere on the map to inspect local pollen levels</div>
 
-  <!-- <button id="drawAreaBtn">Draw Area &amp; Review</button> -->
+  <button id="drawAreaBtn">Draw Area &amp; Review</button>
 
   <div id="map"></div>
 
@@ -372,6 +374,8 @@
       }).addTo(map);
 
       map.on('click', onMapClick);
+
+      // Attach draw button — element is guaranteed to exist here
       document.getElementById('drawAreaBtn').addEventListener('click', toggleDrawingMode);
 
       loadReviews();
@@ -387,7 +391,6 @@
       reportDiv.style.display = 'block';
       listDiv.innerHTML = '<p class="loading-msg">⌛ Fetching local data…</p>';
 
-      // Move or create marker
       if (activeMarker) {
         activeMarker.setLatLng(e.latlng);
       } else {
@@ -438,7 +441,7 @@
           data.reviews.forEach(r => {
             const m = L.marker([r.center_lat, r.center_lng], {
               icon: L.icon({
-                iconUrl: "{{ url_for('static', filename='point.png') }}",  /* FIX: was `url:` */
+                iconUrl: "{{ url_for('static', filename='point.png') }}",
                 iconSize:   [40, 40],
                 iconAnchor: [20, 20]
               })
@@ -461,6 +464,9 @@
         btn.textContent = 'Tap map to place area';
         btn.classList.add('active-draw');
 
+        // Temporarily remove the regular click handler so it doesn't fire
+        map.off('click', onMapClick);
+
         map.once('click', (e) => {
           drawingCircle = L.circle(e.latlng, {
             radius: 2500,
@@ -475,10 +481,11 @@
           btn.classList.remove('active-draw');
         });
       } else {
+        // Cancelled before placing — restore regular click
         btn.textContent = 'Draw Area & Review';
         btn.classList.remove('active-draw');
-        map.off('click');          // remove one-time listener if cancelled
-        map.on('click', onMapClick); // re-attach regular click
+        map.off('click');
+        map.on('click', onMapClick);
       }
     }
 
@@ -496,7 +503,8 @@
         map.removeLayer(drawingCircle);
         drawingCircle = null;
       }
-      // Re-attach regular click handler after modal close
+      // Re-attach regular click handler after closing modal
+      map.off('click');
       map.on('click', onMapClick);
     }
 
@@ -512,7 +520,7 @@
       };
 
       try {
-        const res    = await fetch('/api/reviews', {
+        const res = await fetch('/api/reviews', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify(payload)
@@ -521,6 +529,8 @@
         if (result.success) {
           closeReviewModal();
           loadReviews();
+        } else {
+          console.error('Server error:', result.error);
         }
       } catch (e) {
         console.error('Submit failed:', e);
