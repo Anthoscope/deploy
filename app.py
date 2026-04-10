@@ -1,5 +1,7 @@
 import os
-from flask import Flask, render_template, send_from_directory
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from flask import Flask, render_template, send_from_directory, request, jsonify
 from flask_cors import CORS
 
 # Initialize Flask pointing to the landing subfolder
@@ -8,6 +10,12 @@ CORS(app)
 
 # Use absolute paths to prevent Vercel environment confusion
 BASE_DIR = os.getcwd()
+
+def get_db_connection():
+    """Returns a new psycopg2 connection using the DATABASE_URL env var."""
+    conn = psycopg2.connect(os.environ['DATABASE_URL'])
+    return conn
+
 
 @app.route("/")
 def serve_landing():
@@ -38,29 +46,29 @@ def create_review():
         data = request.json
         conn = get_db_connection()
         cur = conn.cursor()
-        
+
         cur.execute("""
-            INSERT INTO allergy_reviews 
+            INSERT INTO allergy_reviews
             (center_lat, center_lng, radius_km, pollen_type, severity, symptoms, review_text)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             RETURNING id, created_at
         """, (
             data['centerLat'], data['centerLng'], data['radiusKm'],
-            data['pollenType'], data['severity'], data.get('symptoms', []),
-            data.get('reviewText', '')
+            data.get('pollenType', None), data.get('severity', None),
+            data.get('symptoms', []), data.get('reviewText', '')
         ))
-        
+
         result = cur.fetchone()
         conn.commit()
         cur.close()
         conn.close()
-        
+
         return jsonify({
             'success': True,
             'id': result[0],
             'createdAt': result[1].isoformat()
         }), 201
-        
+
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -70,21 +78,21 @@ def get_reviews():
     try:
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        
+
         cur.execute("""
-            SELECT id, center_lat, center_lng, radius_km, pollen_type, 
+            SELECT id, center_lat, center_lng, radius_km, pollen_type,
                    severity, symptoms, review_text, created_at
             FROM allergy_reviews
             ORDER BY created_at DESC
             LIMIT 100
         """)
-        
+
         reviews = cur.fetchall()
         cur.close()
         conn.close()
-        
-        return jsonify({'success': True, 'reviews': reviews}), 200
-        
+
+        return jsonify({'success': True, 'reviews': [dict(r) for r in reviews]}), 200
+
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
