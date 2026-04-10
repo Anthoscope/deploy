@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Anthoscope</title>
 
-  <link rel="shortcut icon" href="{{ url_for('static', filename='anthoscope-logo1.ico') }}">
-  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='anthoscope-logo1.ico') }}">
+  <link rel="shortcut icon" href="/static/anthoscope-logo1.ico">
+  <link rel="icon" type="image/x-icon" href="/static/anthoscope-logo1.ico">
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -25,7 +25,7 @@
     }
 
     * {
-      cursor: url("{{ url_for('static', filename='cursor.png') }}"), auto !important;
+      cursor: url("/static/cursor.png"), auto !important;
       box-sizing: border-box;
       margin: 0;
       padding: 0;
@@ -312,7 +312,7 @@
 
   <!-- Logo -->
   <div id="logo-container">
-    <img src="{{ url_for('static', filename='landing/images/anthologo_neg.png') }}" alt="Anthoscope">
+    <img src="{{ url_for('static', filename='images/anthologo_neg.png') }}" alt="Anthoscope">
   </div>
 
   <div id="pollen-report" class="glass-card">
@@ -441,7 +441,7 @@
           data.reviews.forEach(r => {
             const m = L.marker([r.center_lat, r.center_lng], {
               icon: L.icon({
-                iconUrl: "{{ url_for('static', filename='point.png') }}",
+                iconUrl: "/static/point.png",
                 iconSize:   [40, 40],
                 iconAnchor: [20, 20]
               })
