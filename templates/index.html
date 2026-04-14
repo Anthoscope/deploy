@@ -156,10 +156,14 @@
     #pollen-report {
       top: 136px;
       left: 20px;
-      width: 280px;
-      padding: 18px 20px;
+      width: 300px;
+      padding: 18px 20px 14px;
       display: none;
       animation: slideIn 0.25s ease;
+      max-height: calc(100vh - 200px);
+      overflow: hidden;
+      display: none;
+      flex-direction: column;
     }
 
     @keyframes slideIn {
@@ -173,21 +177,78 @@
       color: var(--pink);
       letter-spacing: 2px;
       text-transform: uppercase;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+
+    /* ── Day Tabs ── */
+    #day-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    .day-tab {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-family: 'Space Mono', monospace;
+      transition: all 0.15s ease;
+      cursor: pointer;
+    }
+    .day-tab:hover { color: var(--text); border-color: rgba(255,77,122,0.4); }
+    .day-tab.active {
+      background: var(--pink);
+      color: white;
+      border-color: var(--pink);
+    }
+
+    /* ── Hourly scroll list ── */
+    #pollen-list {
+      overflow-y: auto;
+      flex: 1;
+      padding-right: 4px;
+    }
+
+    #pollen-list::-webkit-scrollbar { width: 3px; }
+    #pollen-list::-webkit-scrollbar-track { background: transparent; }
+    #pollen-list::-webkit-scrollbar-thumb { background: var(--pink-dim); border-radius: 4px; }
+
+    .hour-block {
       margin-bottom: 14px;
+    }
+
+    .hour-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.6rem;
+      color: var(--pink);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border);
     }
 
     .pollen-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 9px 0;
-      border-bottom: 1px solid var(--border);
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
     }
     .pollen-item:last-child { border-bottom: none; }
 
     .pollen-label {
       font-weight: 700;
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       display: flex;
       align-items: center;
       gap: 6px;
@@ -195,18 +256,19 @@
 
     .pollen-val {
       font-family: 'Space Mono', monospace;
-      font-size: 0.82rem;
+      font-size: 0.78rem;
       color: var(--pink);
     }
 
     .tag {
       padding: 2px 7px;
       border-radius: 4px;
-      font-size: 0.6rem;
+      font-size: 0.58rem;
       font-weight: 700;
       letter-spacing: 0.5px;
       text-transform: uppercase;
     }
+    .tag-none { background: rgba(120,120,120,0.15); color: rgba(200,200,200,0.5); }
     .tag-low  { background: rgba(76,175,80,0.2);  color: #81c784; }
     .tag-mod  { background: rgba(255,193,7,0.2);  color: #ffd54f; }
     .tag-high { background: rgba(239,83,80,0.25); color: #ef9a9a; }
@@ -217,6 +279,25 @@
       color: var(--muted);
       font-family: 'Space Mono', monospace;
     }
+
+    .summary-bar {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+      flex-shrink: 0;
+    }
+
+    .sum-chip {
+      flex: 1;
+      text-align: center;
+      padding: 5px 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 0.58rem;
+      font-family: 'Space Mono', monospace;
+    }
+    .sum-chip .chip-name { color: var(--muted); display: block; margin-bottom: 2px; }
+    .sum-chip .chip-val  { color: var(--pink); font-weight: 700; font-size: 0.72rem; }
 
     /* ── Draw button ── */
     #drawAreaBtn {
@@ -369,6 +450,8 @@
 
   <div id="pollen-report" class="glass-card">
     <h2 id="report-loc">LOCAL POLLEN DATA</h2>
+    <div id="summary-bar" class="summary-bar" style="display:none"></div>
+    <div id="day-tabs"></div>
     <div id="pollen-list"></div>
   </div>
 
@@ -399,17 +482,132 @@
     const DARK_TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 
     const POLLEN_TYPES = [
-      'birch_pollen',
-      'grass_pollen',
-      'ragweed_pollen',
-      'alder_pollen',
-      'mugwort_pollen'
+      { key: 'birch_pollen',   label: 'Birch',   emoji: '🌳' },
+      { key: 'grass_pollen',   label: 'Grass',   emoji: '🌿' },
+      { key: 'ragweed_pollen', label: 'Ragweed', emoji: '🌾' },
+      { key: 'alder_pollen',   label: 'Alder',   emoji: '🍃' },
+      { key: 'mugwort_pollen', label: 'Mugwort', emoji: '🌱' }
     ];
 
+    let pollenByDay = {};   // { "2026-04-14": [ {hour, birch, grass, ...}, ... ] }
+    let activeDayKey = null;
+
     function getCategory(val) {
+      if (val === null || val === undefined) return { label: 'N/A', cls: 'tag-none' };
       if (val > 80) return { label: 'High', cls: 'tag-high' };
       if (val > 30) return { label: 'Mod',  cls: 'tag-mod'  };
-      return              { label: 'Low',  cls: 'tag-low'  };
+      if (val > 0)  return { label: 'Low',  cls: 'tag-low'  };
+      return               { label: '–',    cls: 'tag-none' };
+    }
+
+    function fmtHour(isoStr) {
+      // "2026-04-14T09:00" → "09:00"
+      return isoStr.slice(11, 16);
+    }
+
+    function fmtDateLabel(dateKey) {
+      const d = new Date(dateKey + 'T12:00:00Z');
+      const today = new Date();
+      const todayKey = today.toISOString().slice(0, 10);
+      const tomorrowKey = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+      if (dateKey === todayKey) return 'Today';
+      if (dateKey === tomorrowKey) return 'Tomorrow';
+      return d.toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+    }
+
+    function buildDayData(apiData) {
+      const times = apiData.hourly.time;
+      const result = {};
+
+      times.forEach((t, i) => {
+        const dayKey = t.slice(0, 10);
+        if (!result[dayKey]) result[dayKey] = [];
+
+        const entry = { time: t };
+        let hasAnyData = false;
+        POLLEN_TYPES.forEach(pt => {
+          const val = apiData.hourly[pt.key]?.[i];
+          entry[pt.key] = (val !== null && val !== undefined) ? val : null;
+          if (val !== null && val !== undefined) hasAnyData = true;
+        });
+        if (hasAnyData || result[dayKey].length > 0) {
+          result[dayKey].push(entry);
+        }
+      });
+
+      // Remove days where all values are null
+      Object.keys(result).forEach(day => {
+        const anyReal = result[day].some(h =>
+          POLLEN_TYPES.some(pt => h[pt.key] !== null)
+        );
+        if (!anyReal) delete result[day];
+      });
+
+      return result;
+    }
+
+    function renderDayTabs() {
+      const tabsDiv = document.getElementById('day-tabs');
+      tabsDiv.innerHTML = '';
+      Object.keys(pollenByDay).forEach((dayKey, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'day-tab' + (dayKey === activeDayKey ? ' active' : '');
+        btn.textContent = fmtDateLabel(dayKey);
+        btn.onclick = () => selectDay(dayKey);
+        tabsDiv.appendChild(btn);
+      });
+    }
+
+    function renderSummaryBar(dayKey) {
+      const bar = document.getElementById('summary-bar');
+      const hours = pollenByDay[dayKey] || [];
+      bar.style.display = 'flex';
+      bar.innerHTML = POLLEN_TYPES.slice(0, 4).map(pt => {
+        const vals = hours.map(h => h[pt.key]).filter(v => v !== null);
+        const peak = vals.length ? Math.max(...vals) : null;
+        const { cls } = getCategory(peak);
+        return `<div class="sum-chip ${cls}">
+          <span class="chip-name">${pt.label}</span>
+          <span class="chip-val">${peak !== null ? Math.round(peak) : '–'}</span>
+        </div>`;
+      }).join('');
+    }
+
+    function renderHourList(dayKey) {
+      const listDiv = document.getElementById('pollen-list');
+      const hours = pollenByDay[dayKey] || [];
+
+      // Show only a few key hours or all
+      const display = hours.filter((_, i) => i % 3 === 0 || i === hours.length - 1);
+
+      if (!display.length) {
+        listDiv.innerHTML = '<p class="loading-msg">No data for this day.</p>';
+        return;
+      }
+
+      listDiv.innerHTML = display.map(h => {
+        const rows = POLLEN_TYPES.map(pt => {
+          const val = h[pt.key];
+          const { label, cls } = getCategory(val);
+          const display = val !== null ? Math.round(val) : '–';
+          return `<div class="pollen-item">
+            <span class="pollen-label">${pt.emoji} ${pt.label}<span class="tag ${cls}">${label}</span></span>
+            <span class="pollen-val">${display}</span>
+          </div>`;
+        }).join('');
+
+        return `<div class="hour-block">
+          <div class="hour-label">⏱ ${fmtHour(h.time)}</div>
+          ${rows}
+        </div>`;
+      }).join('');
+    }
+
+    function selectDay(dayKey) {
+      activeDayKey = dayKey;
+      renderDayTabs();
+      renderSummaryBar(dayKey);
+      renderHourList(dayKey);
     }
 
     function pinSVG() {
@@ -419,43 +617,21 @@
       </svg>`;
     }
 
-    function initMap() {
-      map = L.map('map', { zoomControl: false }).setView([48.85, 2.35], 5);
-
-      // Start with dark tiles
-      tileLayer = L.tileLayer(DARK_TILES, {
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-        subdomains: 'abcd',
-        maxZoom: 19
-      }).addTo(map);
-
-      map.on('click', onMapClick);
-
-      // Theme toggle logic
-      const themeToggle = document.getElementById('theme-toggle');
-      themeToggle.addEventListener('change', (e) => {
-        if (e.target.checked) {
-          document.body.classList.add('light-theme');
-          tileLayer.setUrl(LIGHT_TILES);
-        } else {
-          document.body.classList.remove('light-theme');
-          tileLayer.setUrl(DARK_TILES);
-        }
-      });
-
-      document.getElementById('drawAreaBtn').addEventListener('click', toggleDrawingMode);
-      loadReviews();
-    }
-
     async function onMapClick(e) {
       if (isDrawingMode) return;
 
       const { lat, lng } = e.latlng;
       const reportDiv = document.getElementById('pollen-report');
       const listDiv   = document.getElementById('pollen-list');
+      const tabsDiv   = document.getElementById('day-tabs');
+      const bar       = document.getElementById('summary-bar');
 
-      reportDiv.style.display = 'block';
-      listDiv.innerHTML = '<p class="loading-msg">⌛ Fetching local data…</p>';
+      reportDiv.style.display = 'flex';
+      tabsDiv.innerHTML = '';
+      bar.style.display = 'none';
+      listDiv.innerHTML = '<p class="loading-msg">⌛ Fetching forecast…</p>';
+      document.getElementById('report-loc').textContent =
+        `${lat.toFixed(3)}°N  ${lng.toFixed(3)}°E`;
 
       if (activeMarker) {
         activeMarker.setLatLng(e.latlng);
@@ -471,28 +647,62 @@
       }
 
       try {
-        const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&current=${POLLEN_TYPES.join(',')}`;
+        const pollenKeys = POLLEN_TYPES.map(p => p.key).join(',');
+        const url = `https://air-quality-api.open-meteo.com/v1/air-quality` +
+          `?latitude=${lat}&longitude=${lng}` +
+          `&hourly=${pollenKeys}` +
+          `&forecast_days=5` +
+          `&timezone=auto`;
+
         const resp = await fetch(url);
-        if (!resp.ok) throw new Error('API error');
+        if (!resp.ok) throw new Error('API error ' + resp.status);
         const data = await resp.json();
 
-        listDiv.innerHTML = '';
-        POLLEN_TYPES.forEach(type => {
-          const val   = data.current?.[type] ?? 0;
-          const name  = type.split('_')[0].toUpperCase();
-          const { label, cls } = getCategory(val);
-          listDiv.innerHTML += `
-            <div class="pollen-item">
-              <span class="pollen-label">
-                ${name}
-                <span class="tag ${cls}">${label}</span>
-              </span>
-              <span class="pollen-val">${Math.round(val)}</span>
-            </div>`;
-        });
+        pollenByDay = buildDayData(data);
+        const days = Object.keys(pollenByDay);
+
+        if (!days.length) {
+          listDiv.innerHTML = '<p class="loading-msg">⚠ No pollen data available.</p>';
+          return;
+        }
+
+        // Default to today or first available day
+        const todayKey = new Date().toISOString().slice(0, 10);
+        activeDayKey = days.includes(todayKey) ? todayKey : days[0];
+
+        renderDayTabs();
+        renderSummaryBar(activeDayKey);
+        renderHourList(activeDayKey);
+
       } catch (err) {
-        listDiv.innerHTML = '<p class="loading-msg">⚠ Could not fetch data.</p>';
+        listDiv.innerHTML = `<p class="loading-msg">⚠ Could not fetch data.<br><small>${err.message}</small></p>`;
       }
+    }
+
+    function initMap() {
+      map = L.map('map', { zoomControl: false }).setView([48.85, 2.35], 5);
+
+      tileLayer = L.tileLayer(DARK_TILES, {
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+        subdomains: 'abcd',
+        maxZoom: 19
+      }).addTo(map);
+
+      map.on('click', onMapClick);
+
+      const themeToggle = document.getElementById('theme-toggle');
+      themeToggle.addEventListener('change', (e) => {
+        if (e.target.checked) {
+          document.body.classList.add('light-theme');
+          tileLayer.setUrl(LIGHT_TILES);
+        } else {
+          document.body.classList.remove('light-theme');
+          tileLayer.setUrl(DARK_TILES);
+        }
+      });
+
+      document.getElementById('drawAreaBtn').addEventListener('click', toggleDrawingMode);
+      loadReviews();
     }
 
     async function loadReviews() {
