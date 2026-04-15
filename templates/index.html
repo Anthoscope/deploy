@@ -10,6 +10,7 @@
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script defer src="/_vercel/insights/script.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 
@@ -25,660 +26,156 @@
       --muted: rgba(232, 237, 240, 0.45);
       --toggle-bg: #1a2a33;
     }
-
     body.light-theme {
-      --bg: #f0f2f5;
-      --surface: rgba(255, 255, 255, 0.9);
-      --border: rgba(0, 0, 0, 0.1);
-      --text: #1a1e21;
-      --muted: rgba(0, 0, 0, 0.5);
-      --toggle-bg: #87ceeb;
-    }
-
-    * {
-      cursor: url("/static/cursor.png"), auto !important;
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: 'Syne', sans-serif;
-      height: 100vh;
-      background: var(--bg);
-      color: var(--text);
-      overflow: hidden;
-      transition: background 0.3s ease;
-    }
-
-    #map {
-      position: absolute;
-      inset: 0;
-      z-index: 1;
-    }
-
-    body:not(.light-theme) #map {
-      filter: hue-rotate(300deg) brightness(0.95) saturate(1.4);
-    }
-
-    /* ── Logo ── */
-    #logo-container {
-      position: absolute;
-      top: 24px;
-      left: 20px;
-      width: 260px;
-      z-index: 1000;
-      pointer-events: none;
-    }
-    #logo-container img {
-      width: 100%;
-      height: auto;
-      display: block;
-      filter: drop-shadow(0 0 12px var(--pink-glow));
-    }
-
-    /* ── Top-right controls wrapper ── */
-    #top-right-controls {
-      position: absolute;
-      top: 24px;
-      right: 20px;
-      z-index: 1000;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    /* ── Theme Toggle ── */
-    .theme-switch {
-      position: relative;
-      display: inline-block;
-      width: 64px;
-      height: 32px;
-      flex-shrink: 0;
-    }
-
-    .theme-switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .slider {
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-color: var(--toggle-bg);
-      transition: .4s;
-      border-radius: 32px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-    }
-
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 24px;
-      width: 24px;
-      left: 4px;
-      bottom: 3px;
-      background-color: #f3f3f3;
-      transition: .4s cubic-bezier(0.4, 0, 0.2, 1);
-      border-radius: 50%;
-      z-index: 2;
-      box-shadow: 0 0 8px rgba(255,255,255,0.4);
-    }
-
-    input:checked + .slider:before {
-      transform: translateX(32px);
-      background-color: #ffce54;
-      box-shadow: 0 0 15px #ffce54;
-    }
-
-    /* ── Language Selector ── */
-    #lang-wrapper {
-      position: relative;
-    }
-
-    #lang-btn {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 6px 10px;
-      color: var(--text);
-      font-family: 'Syne', sans-serif;
-      font-size: 0.78rem;
-      font-weight: 600;
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      transition: border-color 0.2s, box-shadow 0.2s;
-      white-space: nowrap;
-      height: 32px;
-    }
-
-    #lang-btn:hover {
-      border-color: rgba(255,77,122,0.5);
-      box-shadow: 0 0 0 1px rgba(255,77,122,0.2);
-    }
-
-    #lang-btn svg {
-      flex-shrink: 0;
-      opacity: 0.75;
-    }
-
-    #lang-dropdown {
-      display: none;
-      position: absolute;
-      top: calc(100% + 6px);
-      right: 0;
-      background: var(--surface);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      overflow: hidden;
-      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
-      min-width: 130px;
-      z-index: 2000;
-    }
-
-    #lang-dropdown.open { display: block; }
-
-    .lang-option {
-      padding: 9px 14px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--text);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      transition: background 0.15s;
-    }
-
-    .lang-option:hover {
-      background: var(--pink-dim);
-      color: var(--pink);
-    }
-
-    .lang-option.active {
-      color: var(--pink);
-      background: var(--pink-dim);
-    }
-
-    .lang-flag { font-size: 1rem; }
-
-    /* ── Glass card base ── */
-    .glass-card {
-      background: var(--surface);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-radius: 16px;
-      border: 1px solid var(--border);
-      box-shadow:
-        0 0 0 1px rgba(255,77,122,0.08) inset,
-        0 16px 40px rgba(0, 0, 0, 0.55);
-      z-index: 1000;
-      position: absolute;
-      transition: background 0.3s, border 0.3s;
-    }
-
-    /* ── Search bar ── */
-    #search-wrapper {
-      position: absolute;
-      top: 80px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 1000;
-      width: min(420px, calc(100vw - 48px));
-    }
-
-    #search-container {
-      display: flex;
-      align-items: center;
-      background: var(--surface);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 0 14px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,77,122,0.08) inset;
-      transition: border-color 0.2s, box-shadow 0.2s;
-      gap: 10px;
-    }
-
-    #search-container:focus-within {
-      border-color: rgba(255,77,122,0.5);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 2px rgba(255,77,122,0.2);
-    }
-
-    #search-icon {
-      color: var(--muted);
-      font-size: 1rem;
-      flex-shrink: 0;
-    }
-
-    #search-input {
-      flex: 1;
-      background: transparent;
-      border: none;
-      outline: none;
-      color: var(--text);
-      font-family: 'Syne', sans-serif;
-      font-size: 0.88rem;
-      padding: 12px 0;
-      font-weight: 600;
-    }
-
-    #search-input::placeholder { color: var(--muted); font-weight: 400; }
-
-    #search-btn {
-      background: var(--pink);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      padding: 6px 14px;
-      font-family: 'Syne', sans-serif;
-      font-weight: 700;
-      font-size: 0.78rem;
-      letter-spacing: 0.5px;
-      flex-shrink: 0;
-      transition: opacity 0.15s;
-    }
-
-    #search-btn:hover { opacity: 0.85; }
-
-    #search-results {
-      display: none;
-      margin-top: 6px;
-      background: var(--surface);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-    }
-
-    .search-result-item {
-      padding: 10px 16px;
-      font-size: 0.82rem;
-      color: var(--text);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      transition: background 0.15s;
-    }
-
-    .search-result-item:last-child { border-bottom: none; }
-
-    .search-result-item:hover {
-      background: var(--pink-dim);
-      color: var(--pink);
-    }
-
-    .search-result-item .result-icon { color: var(--pink); font-size: 0.75rem; }
-    .search-result-item .result-name { font-weight: 600; flex: 1; }
-    .search-result-item .result-country { font-size: 0.7rem; color: var(--muted); }
-
-    /* ── Pollen report panel ── */
-    #pollen-report {
-      top: 136px;
-      left: 20px;
-      width: 310px;
-      padding: 18px 20px 14px;
-      display: none;
-      animation: slideIn 0.25s ease;
-      max-height: calc(100vh - 200px);
-      overflow: hidden;
-      flex-direction: column;
-    }
-
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    #report-loc {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.6rem;
-      color: var(--pink);
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      margin-bottom: 10px;
-      flex-shrink: 0;
-    }
-
-    /* ── Pollen type selector ── */
-    #pollen-type-filter {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 10px;
-      flex-shrink: 0;
-      flex-wrap: wrap;
-    }
-
-    .type-chip {
-      padding: 3px 8px;
-      border-radius: 20px;
-      font-size: 0.58rem;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--muted);
-      font-family: 'Space Mono', monospace;
-      transition: all 0.15s ease;
-    }
-    .type-chip:hover { color: var(--text); border-color: rgba(255,77,122,0.4); }
-    .type-chip.active {
-      background: var(--pink);
-      color: white;
-      border-color: var(--pink);
-    }
-
-    /* ── Day Tabs ── */
-    #day-tabs {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 12px;
-      flex-shrink: 0;
-      flex-wrap: wrap;
-    }
-
-    .day-tab {
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 0.62rem;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--muted);
-      font-family: 'Space Mono', monospace;
-      transition: all 0.15s ease;
-    }
-    .day-tab:hover { color: var(--text); border-color: rgba(255,77,122,0.4); }
-    .day-tab.active {
-      background: var(--pink);
-      color: white;
-      border-color: var(--pink);
-    }
-
-    /* ── Hourly scroll list ── */
-    #pollen-list {
-      overflow-y: auto;
-      flex: 1;
-      padding-right: 4px;
-    }
-
-    #pollen-list::-webkit-scrollbar { width: 3px; }
-    #pollen-list::-webkit-scrollbar-track { background: transparent; }
-    #pollen-list::-webkit-scrollbar-thumb { background: var(--pink-dim); border-radius: 4px; }
-
-    .hour-block { margin-bottom: 14px; }
-
-    .hour-label {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.6rem;
-      color: var(--pink);
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      margin-bottom: 6px;
-      padding-bottom: 4px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .pollen-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 5px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.04);
-    }
-    .pollen-item:last-child { border-bottom: none; }
-
-    .pollen-label {
-      font-weight: 700;
-      font-size: 0.75rem;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .pollen-val {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.78rem;
-      color: var(--pink);
-    }
-
-    .tag {
-      padding: 2px 7px;
-      border-radius: 4px;
-      font-size: 0.58rem;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-    }
-    .tag-none { background: rgba(120,120,120,0.15); color: rgba(200,200,200,0.5); }
-    .tag-low  { background: rgba(76,175,80,0.2);  color: #81c784; }
-    .tag-mod  { background: rgba(255,193,7,0.2);  color: #ffd54f; }
-    .tag-high { background: rgba(239,83,80,0.25); color: #ef9a9a; }
-
-    .loading-msg {
-      font-size: 0.78rem;
-      padding: 8px 0;
-      color: var(--muted);
-      font-family: 'Space Mono', monospace;
-    }
-
-    .summary-bar {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 10px;
-      flex-shrink: 0;
-    }
-
-    .sum-chip {
-      flex: 1;
-      text-align: center;
-      padding: 5px 4px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      font-size: 0.58rem;
-      font-family: 'Space Mono', monospace;
-    }
-    .sum-chip .chip-name { color: var(--muted); display: block; margin-bottom: 2px; }
-    .sum-chip .chip-val  { color: var(--pink); font-weight: 700; font-size: 0.72rem; }
-
-    /* ── Draw button ── */
-    #drawAreaBtn {
-      position: absolute;
-      bottom: 28px;
-      left: 20px;
-      z-index: 1000;
-      width: 260px;
-      padding: 14px 20px;
-      background: var(--pink);
-      color: white;
-      border: none;
-      border-radius: 12px;
-      font-family: 'Syne', sans-serif;
-      font-weight: 700;
-      font-size: 0.88rem;
-      letter-spacing: 0.5px;
-      box-shadow: 0 4px 20px var(--pink-glow);
-      transition: all 0.15s ease;
-    }
-    #drawAreaBtn:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 8px 28px var(--pink-glow);
-    }
-    #drawAreaBtn.active-draw {
-      background: #222d33;
-      box-shadow: 0 0 0 2px var(--pink);
-      color: var(--pink);
-    }
-
-    /* ── Hint ── */
-    .hint {
-      position: absolute;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(15, 25, 35, 0.8);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      padding: 10px 24px;
-      border-radius: 30px;
-      border: 1px solid var(--border);
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--pink);
-      z-index: 1000;
-      pointer-events: none;
-      letter-spacing: 0.5px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    }
-
-    /* ── Out-of-bounds toast ── */
-    #oob-toast {
-      display: none;
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      z-index: 3000;
-      background: var(--surface);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid var(--pink);
-      border-radius: 16px;
-      padding: 24px 32px;
-      text-align: center;
-      box-shadow: 0 0 60px rgba(255,77,122,0.3), 0 16px 40px rgba(0,0,0,0.6);
-      max-width: 340px;
-      animation: toastIn 0.25s ease;
-    }
-
-    #oob-toast.visible { display: block; }
-
-    @keyframes toastIn {
-      from { opacity: 0; transform: translate(-50%, -46%); }
-      to   { opacity: 1; transform: translate(-50%, -50%); }
-    }
-
-    #oob-toast .oob-icon { font-size: 2rem; margin-bottom: 10px; }
-    #oob-toast .oob-title {
-      color: var(--pink);
-      font-weight: 800;
-      font-size: 1rem;
-      margin-bottom: 6px;
-      letter-spacing: 0.5px;
-    }
-    #oob-toast .oob-msg {
-      font-size: 0.8rem;
-      color: var(--muted);
-      font-family: 'Space Mono', monospace;
-      line-height: 1.5;
-    }
-    #oob-toast-close {
-      margin-top: 16px;
-      background: var(--pink);
-      color: white;
-      border: none;
-      border-radius: 8px;
-      padding: 8px 20px;
-      font-family: 'Syne', sans-serif;
-      font-weight: 700;
-      font-size: 0.82rem;
-    }
-
-    /* ── Review modal ── */
-    #review-modal {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.75);
-      z-index: 2000;
-      justify-content: center;
-      align-items: center;
-      backdrop-filter: blur(4px);
-    }
-    #review-modal.visible { display: flex; }
-
-    .modal-content {
-      background: var(--surface);
-      padding: 28px;
-      border-radius: 20px;
-      width: 90%;
-      max-width: 400px;
-      border: 1px solid var(--pink);
-      box-shadow: 0 0 60px rgba(255,77,122,0.2);
-    }
-
-    .modal-content h2 {
-      color: var(--pink);
-      font-size: 1.1rem;
-      margin-bottom: 6px;
-    }
-
-    .modal-content p {
-      font-size: 0.75rem;
-      color: var(--muted);
-      font-family: 'Space Mono', monospace;
-      margin-bottom: 14px;
-    }
-
-    .modal-content textarea {
-      width: 100%;
-      height: 100px;
-      padding: 12px;
-      background: rgba(0,0,0,0.1);
-      border: 1px solid var(--border);
-      color: var(--text);
-      border-radius: 10px;
-      font-family: 'Syne', sans-serif;
-      font-size: 0.85rem;
-      resize: none;
-      outline: none;
-    }
-
-    .modal-actions {
-      display: flex;
-      gap: 10px;
-      margin-top: 16px;
-    }
-    .btn-cancel, .btn-submit {
-      flex: 1;
-      padding: 12px;
-      border-radius: 10px;
-      font-family: 'Syne', sans-serif;
-      font-weight: 600;
-      font-size: 0.85rem;
-    }
-    .btn-cancel {
-      background: rgba(0,0,0,0.05);
-      color: var(--text);
-      border: 1px solid var(--border);
-    }
-    .btn-submit {
-      background: var(--pink);
-      color: white;
-      border: none;
-      box-shadow: 0 4px 14px var(--pink-glow);
-    }
-
-    .leaflet-popup-content-wrapper {
-      background: var(--surface) !important;
-      color: var(--text) !important;
-      font-family: 'Syne', sans-serif !important;
-      border-radius: 10px !important;
-      border: 1px solid var(--pink) !important;
-    }
+      --bg: #f0f2f5; --surface: rgba(255,255,255,0.9);
+      --border: rgba(0,0,0,0.1); --text: #1a1e21;
+      --muted: rgba(0,0,0,0.5); --toggle-bg: #87ceeb;
+    }
+    * { cursor: url("/static/cursor.png"), auto !important; box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Syne', sans-serif; height: 100vh; background: var(--bg); color: var(--text); overflow: hidden; transition: background 0.3s ease; }
+
+    #map { position: absolute; inset: 0; z-index: 1; }
+    body:not(.light-theme) #map { filter: hue-rotate(300deg) brightness(0.95) saturate(1.4); }
+
+    #logo-container { position: absolute; top: 24px; left: 20px; width: 260px; z-index: 1000; pointer-events: none; }
+    #logo-container img { width: 100%; height: auto; display: block; filter: drop-shadow(0 0 12px var(--pink-glow)); }
+
+    #top-right-controls { position: absolute; top: 24px; right: 20px; z-index: 1000; display: flex; align-items: center; gap: 10px; }
+
+    .theme-switch { position: relative; display: inline-block; width: 64px; height: 32px; flex-shrink: 0; }
+    .theme-switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; top:0;left:0;right:0;bottom:0; background-color: var(--toggle-bg); transition:.4s; border-radius:32px; overflow:hidden; border:1px solid var(--border); }
+    .slider:before { position:absolute; content:""; height:24px; width:24px; left:4px; bottom:3px; background-color:#f3f3f3; transition:.4s cubic-bezier(0.4,0,0.2,1); border-radius:50%; z-index:2; box-shadow:0 0 8px rgba(255,255,255,0.4); }
+    input:checked + .slider:before { transform:translateX(32px); background-color:#ffce54; box-shadow:0 0 15px #ffce54; }
+
+    #lang-wrapper { position: relative; }
+    #lang-btn { display:flex;align-items:center;gap:6px; background:var(--surface);border:1px solid var(--border);border-radius:10px; padding:6px 10px;color:var(--text);font-family:'Syne',sans-serif;font-size:0.78rem;font-weight:600; backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px); transition:border-color 0.2s,box-shadow 0.2s;white-space:nowrap;height:32px; }
+    #lang-btn:hover { border-color:rgba(255,77,122,0.5); box-shadow:0 0 0 1px rgba(255,77,122,0.2); }
+    #lang-btn svg { flex-shrink:0; opacity:0.75; }
+    #lang-dropdown { display:none;position:absolute;top:calc(100% + 6px);right:0; background:var(--surface);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px); border:1px solid var(--border);border-radius:10px;overflow:hidden; box-shadow:0 12px 40px rgba(0,0,0,0.5);min-width:130px;z-index:2000; }
+    #lang-dropdown.open { display:block; }
+    .lang-option { padding:9px 14px;font-size:0.8rem;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;transition:background 0.15s; }
+    .lang-option:hover { background:var(--pink-dim);color:var(--pink); }
+    .lang-option.active { color:var(--pink);background:var(--pink-dim); }
+    .lang-flag { font-size:1rem; }
+
+    .glass-card { background:var(--surface);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px); border-radius:16px;border:1px solid var(--border); box-shadow:0 0 0 1px rgba(255,77,122,0.08) inset,0 16px 40px rgba(0,0,0,0.55); z-index:1000;position:absolute;transition:background 0.3s,border 0.3s; }
+
+    #search-wrapper { position:absolute;top:80px;left:50%;transform:translateX(-50%); z-index:1000;width:min(420px,calc(100vw - 48px)); }
+    #search-container { display:flex;align-items:center; background:var(--surface);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px); border:1px solid var(--border);border-radius:14px;padding:0 14px; box-shadow:0 8px 32px rgba(0,0,0,0.5),0 0 0 1px rgba(255,77,122,0.08) inset; transition:border-color 0.2s,box-shadow 0.2s;gap:10px; }
+    #search-container:focus-within { border-color:rgba(255,77,122,0.5); box-shadow:0 8px 32px rgba(0,0,0,0.5),0 0 0 2px rgba(255,77,122,0.2); }
+    #search-icon { color:var(--muted);font-size:1rem;flex-shrink:0; }
+    #search-input { flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:'Syne',sans-serif;font-size:0.88rem;padding:12px 0;font-weight:600; }
+    #search-input::placeholder { color:var(--muted);font-weight:400; }
+    #search-btn { background:var(--pink);color:white;border:none;border-radius:8px;padding:6px 14px;font-family:'Syne',sans-serif;font-weight:700;font-size:0.78rem;letter-spacing:0.5px;flex-shrink:0;transition:opacity 0.15s; }
+    #search-btn:hover { opacity:0.85; }
+    #search-results { display:none;margin-top:6px;background:var(--surface);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.5); }
+    .search-result-item { padding:10px 16px;font-size:0.82rem;color:var(--text);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;transition:background 0.15s; }
+    .search-result-item:last-child { border-bottom:none; }
+    .search-result-item:hover { background:var(--pink-dim);color:var(--pink); }
+    .search-result-item .result-icon { color:var(--pink);font-size:0.75rem; }
+    .search-result-item .result-name { font-weight:600;flex:1; }
+    .search-result-item .result-country { font-size:0.7rem;color:var(--muted); }
+
+    #pollen-report { top:136px;left:20px;width:310px;padding:18px 20px 14px; display:none;animation:slideIn 0.25s ease;max-height:calc(100vh - 220px);overflow:hidden;flex-direction:column; }
+    @keyframes slideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+    #report-loc { font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--pink);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;flex-shrink:0; }
+
+    #pollen-type-filter { display:flex;gap:4px;margin-bottom:10px;flex-shrink:0;flex-wrap:wrap; }
+    .type-chip { padding:3px 8px;border-radius:20px;font-size:0.58rem;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Space Mono',monospace;transition:all 0.15s ease; }
+    .type-chip:hover { color:var(--text);border-color:rgba(255,77,122,0.4); }
+    .type-chip.active { background:var(--pink);color:white;border-color:var(--pink); }
+
+    #day-tabs { display:flex;gap:4px;margin-bottom:12px;flex-shrink:0;flex-wrap:wrap; }
+    .day-tab { padding:4px 10px;border-radius:6px;font-size:0.62rem;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Space Mono',monospace;transition:all 0.15s ease; }
+    .day-tab:hover { color:var(--text);border-color:rgba(255,77,122,0.4); }
+    .day-tab.active { background:var(--pink);color:white;border-color:var(--pink); }
+
+    #pollen-list { overflow-y:auto;flex:1;padding-right:4px; }
+    #pollen-list::-webkit-scrollbar { width:3px; }
+    #pollen-list::-webkit-scrollbar-track { background:transparent; }
+    #pollen-list::-webkit-scrollbar-thumb { background:var(--pink-dim);border-radius:4px; }
+
+    .hour-block { margin-bottom:14px; }
+    .hour-label { font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--pink);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border); }
+    .pollen-item { display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04); }
+    .pollen-item:last-child { border-bottom:none; }
+    .pollen-label { font-weight:700;font-size:0.75rem;display:flex;align-items:center;gap:6px; }
+    .pollen-val { font-family:'Space Mono',monospace;font-size:0.78rem;color:var(--pink); }
+
+    /* Tag + tooltip */
+    .tag-wrap { display:inline-flex;align-items:center;gap:3px;position:relative; }
+    .tag { padding:2px 7px;border-radius:4px;font-size:0.58rem;font-weight:700;letter-spacing:0.5px;text-transform:uppercase; }
+    .tag-none { background:rgba(120,120,120,0.15);color:rgba(200,200,200,0.5); }
+    .tag-low  { background:rgba(76,175,80,0.2);color:#81c784; }
+    .tag-mod  { background:rgba(255,193,7,0.2);color:#ffd54f; }
+    .tag-high { background:rgba(239,83,80,0.25);color:#ef9a9a; }
+
+    .tag-info { display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:50%;font-size:0.5rem;font-weight:700;border:1px solid currentColor;opacity:0.6;line-height:1;flex-shrink:0;position:relative;transition:opacity 0.15s;font-family:'Space Mono',monospace; }
+    .tag-info:hover { opacity:1; }
+    .tag-tooltip { display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);width:190px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:0.64rem;font-family:'Space Mono',monospace;color:var(--text);line-height:1.55;z-index:5000;box-shadow:0 8px 24px rgba(0,0,0,0.65);pointer-events:none;white-space:normal;text-align:left;letter-spacing:0;text-transform:none;font-weight:400; }
+    .tag-tooltip::after { content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--border); }
+    .tag-info:hover .tag-tooltip { display:block; }
+
+    .loading-msg { font-size:0.78rem;padding:8px 0;color:var(--muted);font-family:'Space Mono',monospace; }
+    .summary-bar { display:flex;gap:6px;margin-bottom:10px;flex-shrink:0; }
+    .sum-chip { flex:1;text-align:center;padding:5px 4px;border-radius:8px;border:1px solid var(--border);font-size:0.58rem;font-family:'Space Mono',monospace; }
+    .sum-chip .chip-name { color:var(--muted);display:block;margin-bottom:2px; }
+    .sum-chip .chip-val { color:var(--pink);font-weight:700;font-size:0.72rem; }
+
+    #plot-btn { margin-top:10px;flex-shrink:0;width:100%;padding:9px;background:transparent;border:1px solid var(--pink);border-radius:10px;color:var(--pink);font-family:'Syne',sans-serif;font-weight:700;font-size:0.78rem;letter-spacing:0.5px;transition:background 0.15s,color 0.15s;display:flex;align-items:center;justify-content:center;gap:6px; }
+    #plot-btn:hover { background:var(--pink);color:white; }
+
+    #drawAreaBtn { position:absolute;bottom:28px;left:20px;z-index:1000;width:260px;padding:14px 20px;background:var(--pink);color:white;border:none;border-radius:12px;font-family:'Syne',sans-serif;font-weight:700;font-size:0.88rem;letter-spacing:0.5px;box-shadow:0 4px 20px var(--pink-glow);transition:all 0.15s ease; }
+    #drawAreaBtn:hover { transform:translateY(-1px);box-shadow:0 8px 28px var(--pink-glow); }
+    #drawAreaBtn.active-draw { background:#222d33;box-shadow:0 0 0 2px var(--pink);color:var(--pink); }
+
+    .hint { position:absolute;bottom:30px;left:50%;transform:translateX(-50%);background:rgba(15,25,35,0.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:10px 24px;border-radius:30px;border:1px solid var(--border);font-size:0.8rem;font-weight:600;color:var(--pink);z-index:1000;pointer-events:none;letter-spacing:0.5px;box-shadow:0 8px 32px rgba(0,0,0,0.4); }
+
+    #oob-toast { display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:3000;background:var(--surface);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--pink);border-radius:16px;padding:24px 32px;text-align:center;box-shadow:0 0 60px rgba(255,77,122,0.3),0 16px 40px rgba(0,0,0,0.6);max-width:340px; }
+    #oob-toast.visible { display:block;animation:toastIn 0.25s ease; }
+    @keyframes toastIn { from{opacity:0;transform:translate(-50%,-46%)} to{opacity:1;transform:translate(-50%,-50%)} }
+    #oob-toast .oob-icon { font-size:2rem;margin-bottom:10px; }
+    #oob-toast .oob-title { color:var(--pink);font-weight:800;font-size:1rem;margin-bottom:6px;letter-spacing:0.5px; }
+    #oob-toast .oob-msg { font-size:0.8rem;color:var(--muted);font-family:'Space Mono',monospace;line-height:1.5; }
+    #oob-toast-close { margin-top:16px;background:var(--pink);color:white;border:none;border-radius:8px;padding:8px 20px;font-family:'Syne',sans-serif;font-weight:700;font-size:0.82rem; }
+
+    /* Chart modal */
+    #chart-modal { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.82);z-index:4000;justify-content:center;align-items:center;backdrop-filter:blur(6px); }
+    #chart-modal.visible { display:flex; }
+    #chart-modal-inner { background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px 28px 24px;width:min(840px,96vw);max-height:92vh;overflow-y:auto;display:flex;flex-direction:column;gap:18px;box-shadow:0 0 80px rgba(255,77,122,0.2),0 24px 60px rgba(0,0,0,0.7); }
+    #chart-modal-inner::-webkit-scrollbar { width:3px; }
+    #chart-modal-inner::-webkit-scrollbar-thumb { background:var(--pink-dim);border-radius:4px; }
+    .chart-modal-header { display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0; }
+    .chart-modal-header h2 { color:var(--pink);font-size:1.1rem;font-weight:800; }
+    .chart-modal-header p { font-size:0.72rem;color:var(--muted);font-family:'Space Mono',monospace;margin-top:4px; }
+    #chart-close-btn { background:none;border:1px solid var(--border);border-radius:8px;width:32px;height:32px;color:var(--muted);font-size:1.1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:border-color 0.15s,color 0.15s; }
+    #chart-close-btn:hover { border-color:var(--pink);color:var(--pink); }
+    .chart-selectors { display:flex;gap:20px;flex-wrap:wrap;flex-shrink:0; }
+    .chart-selector-group { flex:1;min-width:200px; }
+    .chart-selector-group label { display:block;font-size:0.62rem;font-family:'Space Mono',monospace;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px; }
+    .chart-chips { display:flex;flex-wrap:wrap;gap:6px; }
+    .chart-chip { padding:5px 12px;border-radius:20px;font-size:0.62rem;font-weight:700;letter-spacing:0.5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Space Mono',monospace;transition:all 0.15s ease; }
+    .chart-chip:hover { color:var(--text);border-color:rgba(255,77,122,0.4); }
+    .chart-chip.active { background:var(--pink);color:white;border-color:var(--pink); }
+    .chart-render-btn { align-self:flex-start;padding:10px 24px;background:var(--pink);color:white;border:none;border-radius:10px;font-family:'Syne',sans-serif;font-weight:700;font-size:0.82rem;letter-spacing:0.5px;transition:opacity 0.15s;flex-shrink:0;box-shadow:0 4px 16px var(--pink-glow); }
+    .chart-render-btn:hover { opacity:0.85; }
+    #chart-canvas-wrap { position:relative;width:100%;border-radius:12px;background:rgba(0,0,0,0.12);border:1px solid var(--border);padding:16px;flex-shrink:0;min-height:280px;display:flex;align-items:center;justify-content:center; }
+    #chart-canvas-wrap canvas { display:block;width:100% !important; }
+    #chart-placeholder { font-family:'Space Mono',monospace;font-size:0.8rem;color:var(--muted);text-align:center; }
+
+    #review-modal { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:2000;justify-content:center;align-items:center;backdrop-filter:blur(4px); }
+    #review-modal.visible { display:flex; }
+    .modal-content { background:var(--surface);padding:28px;border-radius:20px;width:90%;max-width:400px;border:1px solid var(--pink);box-shadow:0 0 60px rgba(255,77,122,0.2); }
+    .modal-content h2 { color:var(--pink);font-size:1.1rem;margin-bottom:6px; }
+    .modal-content p { font-size:0.75rem;color:var(--muted);font-family:'Space Mono',monospace;margin-bottom:14px; }
+    .modal-content textarea { width:100%;height:100px;padding:12px;background:rgba(0,0,0,0.1);border:1px solid var(--border);color:var(--text);border-radius:10px;font-family:'Syne',sans-serif;font-size:0.85rem;resize:none;outline:none; }
+    .modal-actions { display:flex;gap:10px;margin-top:16px; }
+    .btn-cancel,.btn-submit { flex:1;padding:12px;border-radius:10px;font-family:'Syne',sans-serif;font-weight:600;font-size:0.85rem; }
+    .btn-cancel { background:rgba(0,0,0,0.05);color:var(--text);border:1px solid var(--border); }
+    .btn-submit { background:var(--pink);color:white;border:none;box-shadow:0 4px 14px var(--pink-glow); }
+    .leaflet-popup-content-wrapper { background:var(--surface) !important;color:var(--text) !important;font-family:'Syne',sans-serif !important;border-radius:10px !important;border:1px solid var(--pink) !important; }
   </style>
 </head>
 <body>
@@ -687,9 +184,7 @@
     <img src="{{ url_for('static', filename='images/anthologo_neg.png') }}" alt="Anthoscope">
   </div>
 
-  <!-- Top-right: language selector + theme toggle -->
   <div id="top-right-controls">
-    <!-- Language selector -->
     <div id="lang-wrapper">
       <button id="lang-btn" onclick="toggleLangDropdown()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -705,15 +200,12 @@
         <div class="lang-option" onclick="setLanguage('es')"><span class="lang-flag">🇪🇸</span> Español</div>
       </div>
     </div>
-
-    <!-- Theme toggle -->
     <label class="theme-switch">
       <input type="checkbox" id="theme-toggle">
       <span class="slider"></span>
     </label>
   </div>
 
-  <!-- Search bar -->
   <div id="search-wrapper">
     <div id="search-container">
       <span id="search-icon">🔍</span>
@@ -725,27 +217,52 @@
 
   <div id="pollen-report" class="glass-card">
     <h2 id="report-loc">LOCAL POLLEN DATA</h2>
-
-    <!-- Pollen type filter -->
     <div id="pollen-type-filter"></div>
-
     <div id="summary-bar" class="summary-bar" style="display:none"></div>
     <div id="day-tabs"></div>
     <div id="pollen-list"></div>
+    <button id="plot-btn" onclick="openChartModal()">
+      📈 <span data-i18n="plot_btn">Plot Pollen Data</span>
+    </button>
   </div>
 
   <div class="hint" id="hint-text">📍 Tap anywhere on the map to inspect local pollen levels</div>
-
   <button id="drawAreaBtn">Draw Area &amp; Review</button>
-
   <div id="map"></div>
 
-  <!-- Out-of-bounds toast -->
   <div id="oob-toast">
     <div class="oob-icon">🌍</div>
     <div class="oob-title" data-i18n="oob_title">Outside Coverage Area</div>
     <div class="oob-msg" data-i18n="oob_msg">Anthoscope does not support this location yet.</div>
     <button id="oob-toast-close" onclick="closeOobToast()" data-i18n="oob_close">Got it</button>
+  </div>
+
+  <!-- Chart Modal -->
+  <div id="chart-modal">
+    <div id="chart-modal-inner">
+      <div class="chart-modal-header">
+        <div>
+          <h2 data-i18n="chart_title">Pollen Forecast Chart</h2>
+          <p id="chart-modal-loc"></p>
+        </div>
+        <button id="chart-close-btn" onclick="closeChartModal()">✕</button>
+      </div>
+      <div class="chart-selectors">
+        <div class="chart-selector-group">
+          <label data-i18n="chart_select_types">Select Pollen Types</label>
+          <div class="chart-chips" id="chart-type-chips"></div>
+        </div>
+        <div class="chart-selector-group">
+          <label data-i18n="chart_select_days">Select Days</label>
+          <div class="chart-chips" id="chart-day-chips"></div>
+        </div>
+      </div>
+      <button class="chart-render-btn" onclick="renderChart()" data-i18n="chart_render_btn">Generate Chart</button>
+      <div id="chart-canvas-wrap">
+        <div id="chart-placeholder" data-i18n="chart_placeholder">Select pollen types and days above, then click Generate Chart.</div>
+        <canvas id="pollen-chart" style="display:none"></canvas>
+      </div>
+    </div>
   </div>
 
   <div id="review-modal">
@@ -761,653 +278,632 @@
   </div>
 
   <script>
-    /* ─────────────────────────────────────
-       TRANSLATIONS
-    ───────────────────────────────────── */
-    const TRANSLATIONS = {
-      en: {
-        search_placeholder: 'Search a city or location…',
-        search_btn: 'Go',
-        hint: '📍 Tap anywhere on the map to inspect local pollen levels',
-        draw_btn: 'Draw Area & Review',
-        draw_btn_active: 'Tap map to place area',
-        oob_title: 'Outside Coverage Area',
-        oob_msg: 'Anthoscope does not support this location yet.',
-        oob_close: 'Got it',
-        review_title: 'Submit Allergy Review',
-        review_placeholder: 'Describe the pollen impact in this area…',
-        cancel: 'Cancel',
-        submit: 'Submit',
-        fetching: '⌛ Fetching forecast…',
-        no_data_day: 'No data for this day.',
-        no_data: '⚠ No pollen data available.',
-        fetch_error: '⚠ Could not fetch data.',
-        today: 'Today',
-        tomorrow: 'Tomorrow',
-        all_types: 'All',
-        pollen_types_labels: { birch: 'Birch', grass: 'Grass', ragweed: 'Ragweed', alder: 'Alder', mugwort: 'Mugwort' },
-        cat_high: 'High', cat_mod: 'Mod', cat_low: 'Low', cat_na: 'N/A', cat_none: '–',
-        no_results: 'No results found',
-        searching: 'Searching…',
-      },
-      el: {
-        search_placeholder: 'Αναζήτηση πόλης ή τοποθεσίας…',
-        search_btn: 'Αναζήτηση',
-        hint: '📍 Πατήστε οπουδήποτε στον χάρτη για επίπεδα γύρης',
-        draw_btn: 'Σχεδίαση Περιοχής & Αξιολόγηση',
-        draw_btn_active: 'Πατήστε στον χάρτη για τοποθέτηση',
-        oob_title: 'Εκτός Περιοχής Κάλυψης',
-        oob_msg: 'Το Anthoscope δεν υποστηρίζει αυτήν την τοποθεσία ακόμα.',
-        oob_close: 'Εντάξει',
-        review_title: 'Υποβολή Αξιολόγησης Αλλεργίας',
-        review_placeholder: 'Περιγράψτε την επίδραση της γύρης σε αυτήν την περιοχή…',
-        cancel: 'Ακύρωση',
-        submit: 'Υποβολή',
-        fetching: '⌛ Λήψη πρόγνωσης…',
-        no_data_day: 'Δεν υπάρχουν δεδομένα για αυτήν την ημέρα.',
-        no_data: '⚠ Δεν υπάρχουν δεδομένα γύρης.',
-        fetch_error: '⚠ Αδύνατη η λήψη δεδομένων.',
-        today: 'Σήμερα',
-        tomorrow: 'Αύριο',
-        all_types: 'Όλα',
-        pollen_types_labels: { birch: 'Σημύδα', grass: 'Χόρτο', ragweed: 'Αγριόχορτο', alder: 'Σκλήθρα', mugwort: 'Αρτεμισία' },
-        cat_high: 'Υψηλό', cat_mod: 'Μέτριο', cat_low: 'Χαμηλό', cat_na: 'Ν/Α', cat_none: '–',
-        no_results: 'Δεν βρέθηκαν αποτελέσματα',
-        searching: 'Αναζήτηση…',
-      },
-      de: {
-        search_placeholder: 'Stadt oder Ort suchen…',
-        search_btn: 'Suchen',
-        hint: '📍 Auf die Karte tippen, um lokale Pollenwerte zu prüfen',
-        draw_btn: 'Bereich zeichnen & Bewerten',
-        draw_btn_active: 'Karte tippen zum Platzieren',
-        oob_title: 'Außerhalb des Abdeckungsbereichs',
-        oob_msg: 'Anthoscope unterstützt diesen Standort noch nicht.',
-        oob_close: 'Verstanden',
-        review_title: 'Allergie-Bewertung einreichen',
-        review_placeholder: 'Beschreiben Sie die Pollenbelastung in diesem Bereich…',
-        cancel: 'Abbrechen',
-        submit: 'Einreichen',
-        fetching: '⌛ Prognose wird geladen…',
-        no_data_day: 'Keine Daten für diesen Tag.',
-        no_data: '⚠ Keine Pollendaten verfügbar.',
-        fetch_error: '⚠ Daten konnten nicht abgerufen werden.',
-        today: 'Heute',
-        tomorrow: 'Morgen',
-        all_types: 'Alle',
-        pollen_types_labels: { birch: 'Birke', grass: 'Gras', ragweed: 'Beifuß-Ambrosie', alder: 'Erle', mugwort: 'Beifuß' },
-        cat_high: 'Hoch', cat_mod: 'Mittel', cat_low: 'Niedrig', cat_na: 'N/V', cat_none: '–',
-        no_results: 'Keine Ergebnisse gefunden',
-        searching: 'Suche läuft…',
-      },
-      es: {
-        search_placeholder: 'Buscar ciudad o lugar…',
-        search_btn: 'Buscar',
-        hint: '📍 Toca el mapa para inspeccionar los niveles de polen locales',
-        draw_btn: 'Dibujar Área y Reseñar',
-        draw_btn_active: 'Toca el mapa para colocar el área',
-        oob_title: 'Fuera del Área de Cobertura',
-        oob_msg: 'Anthoscope aún no admite esta ubicación.',
-        oob_close: 'Entendido',
-        review_title: 'Enviar Reseña de Alergia',
-        review_placeholder: 'Describe el impacto del polen en esta área…',
-        cancel: 'Cancelar',
-        submit: 'Enviar',
-        fetching: '⌛ Obteniendo pronóstico…',
-        no_data_day: 'No hay datos para este día.',
-        no_data: '⚠ No hay datos de polen disponibles.',
-        fetch_error: '⚠ No se pudieron obtener datos.',
-        today: 'Hoy',
-        tomorrow: 'Mañana',
-        all_types: 'Todo',
-        pollen_types_labels: { birch: 'Abedul', grass: 'Hierba', ragweed: 'Ambrosía', alder: 'Aliso', mugwort: 'Artemisa' },
-        cat_high: 'Alto', cat_mod: 'Mod.', cat_low: 'Bajo', cat_na: 'N/D', cat_none: '–',
-        no_results: 'No se encontraron resultados',
-        searching: 'Buscando…',
+  /* ══ TRANSLATIONS ══ */
+  const TRANSLATIONS = {
+    en: {
+      search_placeholder:'Search a city or location…', search_btn:'Go',
+      hint:'📍 Tap anywhere on the map to inspect local pollen levels',
+      draw_btn:'Draw Area & Review', draw_btn_active:'Tap map to place area',
+      oob_title:'Outside Coverage Area', oob_msg:'Anthoscope does not support this location yet.', oob_close:'Got it',
+      review_title:'Submit Allergy Review', review_placeholder:'Describe the pollen impact in this area…',
+      cancel:'Cancel', submit:'Submit',
+      fetching:'⌛ Fetching forecast…', no_data_day:'No data for this day.',
+      no_data:'⚠ No pollen data available.', fetch_error:'⚠ Could not fetch data.',
+      today:'Today', tomorrow:'Tomorrow', all_types:'All',
+      pollen_types_labels:{birch:'Birch',grass:'Grass',ragweed:'Ragweed',alder:'Alder',mugwort:'Mugwort'},
+      cat_high:'High', cat_mod:'Mod', cat_low:'Low', cat_na:'N/A', cat_none:'–',
+      no_results:'No results found', searching:'Searching…',
+      plot_btn:'Plot Pollen Data', chart_title:'Pollen Forecast Chart',
+      chart_select_types:'Select Pollen Types', chart_select_days:'Select Days',
+      chart_render_btn:'Generate Chart', chart_placeholder:'Select pollen types and days above, then click Generate Chart.',
+      severity_desc:{
+        high:'HIGH (>80 grains/m³): Very likely to trigger severe allergy symptoms. Sensitive individuals should stay indoors and consider taking medication.',
+        mod:'MODERATE (31–80 grains/m³): May cause symptoms in people with moderate sensitivities. Consider antihistamines before going outside.',
+        low:'LOW (1–30 grains/m³): Unlikely to affect most people. Mild symptoms possible only for highly sensitive individuals.',
+        none:'NONE / N/A: No significant pollen detected for this period, or data is not available.'
       }
-    };
-
-    let currentLang = 'en';
-
-    function t(key) {
-      return TRANSLATIONS[currentLang]?.[key] ?? TRANSLATIONS['en'][key] ?? key;
-    }
-
-    function applyTranslations() {
-      // data-i18n elements
-      document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.dataset.i18n;
-        el.textContent = t(key);
-      });
-      // data-i18n-placeholder elements
-      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-        el.placeholder = t(el.dataset.i18nPlaceholder);
-      });
-      // hint
-      document.getElementById('hint-text').textContent = t('hint');
-      // draw button (unless active)
-      const drawBtn = document.getElementById('drawAreaBtn');
-      if (!drawBtn.classList.contains('active-draw')) {
-        drawBtn.textContent = t('draw_btn');
+    },
+    el: {
+      search_placeholder:'Αναζήτηση πόλης ή τοποθεσίας…', search_btn:'Αναζήτηση',
+      hint:'📍 Πατήστε οπουδήποτε στον χάρτη για επίπεδα γύρης',
+      draw_btn:'Σχεδίαση Περιοχής & Αξιολόγηση', draw_btn_active:'Πατήστε στον χάρτη για τοποθέτηση',
+      oob_title:'Εκτός Περιοχής Κάλυψης', oob_msg:'Το Anthoscope δεν υποστηρίζει αυτήν την τοποθεσία ακόμα.', oob_close:'Εντάξει',
+      review_title:'Υποβολή Αξιολόγησης Αλλεργίας', review_placeholder:'Περιγράψτε την επίδραση της γύρης σε αυτήν την περιοχή…',
+      cancel:'Ακύρωση', submit:'Υποβολή',
+      fetching:'⌛ Λήψη πρόγνωσης…', no_data_day:'Δεν υπάρχουν δεδομένα για αυτήν την ημέρα.',
+      no_data:'⚠ Δεν υπάρχουν δεδομένα γύρης.', fetch_error:'⚠ Αδύνατη η λήψη δεδομένων.',
+      today:'Σήμερα', tomorrow:'Αύριο', all_types:'Όλα',
+      pollen_types_labels:{birch:'Σημύδα',grass:'Χόρτο',ragweed:'Αγριόχορτο',alder:'Σκλήθρα',mugwort:'Αρτεμισία'},
+      cat_high:'Υψηλό', cat_mod:'Μέτριο', cat_low:'Χαμηλό', cat_na:'Ν/Α', cat_none:'–',
+      no_results:'Δεν βρέθηκαν αποτελέσματα', searching:'Αναζήτηση…',
+      plot_btn:'Γράφημα Γύρης', chart_title:'Γράφημα Πρόγνωσης Γύρης',
+      chart_select_types:'Επιλογή Τύπων Γύρης', chart_select_days:'Επιλογή Ημερών',
+      chart_render_btn:'Δημιουργία Γραφήματος', chart_placeholder:'Επιλέξτε τύπους γύρης και ημέρες και κάντε κλικ στη Δημιουργία.',
+      severity_desc:{
+        high:'ΥΨΗΛΟ (>80 κόκκοι/m³): Πιθανό να προκαλέσει σοβαρά συμπτώματα αλλεργίας. Οι ευαίσθητοι να παραμείνουν σε εσωτερικούς χώρους.',
+        mod:'ΜΕΤΡΙΟ (31–80 κόκκοι/m³): Μπορεί να προκαλέσει συμπτώματα σε άτομα με μέτρια ευαισθησία. Συνιστώνται αντιισταμινικά.',
+        low:'ΧΑΜΗΛΟ (1–30 κόκκοι/m³): Απίθανο να επηρεάσει τους περισσότερους. Ήπια συμπτώματα μόνο σε πολύ ευαίσθητα άτομα.',
+        none:'ΜΗΔΕΝ / Ν/Α: Δεν εντοπίστηκε σημαντική γύρη ή τα δεδομένα δεν είναι διαθέσιμα.'
       }
-      // re-render pollen type filter labels
-      renderPollenTypeFilter();
-    }
-
-    function setLanguage(lang) {
-      currentLang = lang;
-      document.getElementById('lang-label').textContent = lang.toUpperCase();
-      // update active state on options
-      document.querySelectorAll('.lang-option').forEach(el => el.classList.remove('active'));
-      document.querySelector(`.lang-option[onclick="setLanguage('${lang}')"]`).classList.add('active');
-      closeLangDropdown();
-      applyTranslations();
-      // re-render pollen panel if open
-      if (activeDayKey) {
-        renderDayTabs();
-        renderSummaryBar(activeDayKey);
-        renderHourList(activeDayKey);
+    },
+    de: {
+      search_placeholder:'Stadt oder Ort suchen…', search_btn:'Suchen',
+      hint:'📍 Auf die Karte tippen, um lokale Pollenwerte zu prüfen',
+      draw_btn:'Bereich zeichnen & Bewerten', draw_btn_active:'Karte tippen zum Platzieren',
+      oob_title:'Außerhalb des Abdeckungsbereichs', oob_msg:'Anthoscope unterstützt diesen Standort noch nicht.', oob_close:'Verstanden',
+      review_title:'Allergie-Bewertung einreichen', review_placeholder:'Beschreiben Sie die Pollenbelastung in diesem Bereich…',
+      cancel:'Abbrechen', submit:'Einreichen',
+      fetching:'⌛ Prognose wird geladen…', no_data_day:'Keine Daten für diesen Tag.',
+      no_data:'⚠ Keine Pollendaten verfügbar.', fetch_error:'⚠ Daten konnten nicht abgerufen werden.',
+      today:'Heute', tomorrow:'Morgen', all_types:'Alle',
+      pollen_types_labels:{birch:'Birke',grass:'Gras',ragweed:'Beifuß-Ambrosie',alder:'Erle',mugwort:'Beifuß'},
+      cat_high:'Hoch', cat_mod:'Mittel', cat_low:'Niedrig', cat_na:'N/V', cat_none:'–',
+      no_results:'Keine Ergebnisse gefunden', searching:'Suche läuft…',
+      plot_btn:'Pollen-Diagramm', chart_title:'Pollen-Prognose-Diagramm',
+      chart_select_types:'Pollenarten auswählen', chart_select_days:'Tage auswählen',
+      chart_render_btn:'Diagramm erstellen', chart_placeholder:'Pollenarten und Tage auswählen, dann auf Erstellen klicken.',
+      severity_desc:{
+        high:'HOCH (>80 Körner/m³): Kann starke Allergiesymptome auslösen. Empfindlichen Personen wird empfohlen, drinnen zu bleiben.',
+        mod:'MITTEL (31–80 Körner/m³): Kann bei mittlerer Empfindlichkeit Symptome verursachen. Antihistaminika in Betracht ziehen.',
+        low:'NIEDRIG (1–30 Körner/m³): Für die meisten unproblematisch. Leichte Symptome bei sehr empfindlichen Personen möglich.',
+        none:'KEINE / N/V: Kein nennenswerter Pollen oder Daten nicht verfügbar für diesen Zeitraum.'
+      }
+    },
+    es: {
+      search_placeholder:'Buscar ciudad o lugar…', search_btn:'Buscar',
+      hint:'📍 Toca el mapa para inspeccionar los niveles de polen locales',
+      draw_btn:'Dibujar Área y Reseñar', draw_btn_active:'Toca el mapa para colocar el área',
+      oob_title:'Fuera del Área de Cobertura', oob_msg:'Anthoscope aún no admite esta ubicación.', oob_close:'Entendido',
+      review_title:'Enviar Reseña de Alergia', review_placeholder:'Describe el impacto del polen en esta área…',
+      cancel:'Cancelar', submit:'Enviar',
+      fetching:'⌛ Obteniendo pronóstico…', no_data_day:'No hay datos para este día.',
+      no_data:'⚠ No hay datos de polen disponibles.', fetch_error:'⚠ No se pudieron obtener datos.',
+      today:'Hoy', tomorrow:'Mañana', all_types:'Todo',
+      pollen_types_labels:{birch:'Abedul',grass:'Hierba',ragweed:'Ambrosía',alder:'Aliso',mugwort:'Artemisa'},
+      cat_high:'Alto', cat_mod:'Mod.', cat_low:'Bajo', cat_na:'N/D', cat_none:'–',
+      no_results:'No se encontraron resultados', searching:'Buscando…',
+      plot_btn:'Graficar Polen', chart_title:'Gráfico de Pronóstico de Polen',
+      chart_select_types:'Seleccionar Tipos de Polen', chart_select_days:'Seleccionar Días',
+      chart_render_btn:'Generar Gráfico', chart_placeholder:'Selecciona tipos y días, luego haz clic en Generar Gráfico.',
+      severity_desc:{
+        high:'ALTO (>80 granos/m³): Muy probable que provoque síntomas graves. Se recomienda quedarse en interiores y tomar medicación.',
+        mod:'MODERADO (31–80 granos/m³): Puede causar síntomas en personas con sensibilidad moderada. Considera antihistamínicos.',
+        low:'BAJO (1–30 granos/m³): Poco probable que afecte a la mayoría. Síntomas leves posibles en personas muy sensibles.',
+        none:'NINGUNO / N/D: No se detectó polen significativo o datos no disponibles para este período.'
       }
     }
+  };
 
-    function toggleLangDropdown() {
-      document.getElementById('lang-dropdown').classList.toggle('open');
-    }
-    function closeLangDropdown() {
-      document.getElementById('lang-dropdown').classList.remove('open');
-    }
+  let currentLang = 'en';
+  function t(key) { return TRANSLATIONS[currentLang]?.[key] ?? TRANSLATIONS['en'][key] ?? key; }
 
-    document.addEventListener('click', (e) => {
-      if (!document.getElementById('lang-wrapper').contains(e.target)) {
-        closeLangDropdown();
-      }
+  function applyTranslations() {
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+    document.getElementById('hint-text').textContent = t('hint');
+    const db = document.getElementById('drawAreaBtn');
+    if (!db.classList.contains('active-draw')) db.textContent = t('draw_btn');
+    renderPollenTypeFilter();
+  }
+
+  function setLanguage(lang) {
+    currentLang = lang;
+    document.getElementById('lang-label').textContent = lang.toUpperCase();
+    document.querySelectorAll('.lang-option').forEach(el => el.classList.remove('active'));
+    document.querySelector(`.lang-option[onclick="setLanguage('${lang}')"]`).classList.add('active');
+    closeLangDropdown();
+    applyTranslations();
+    if (activeDayKey) { renderDayTabs(); renderSummaryBar(activeDayKey); renderHourList(activeDayKey); }
+  }
+
+  function toggleLangDropdown() { document.getElementById('lang-dropdown').classList.toggle('open'); }
+  function closeLangDropdown()  { document.getElementById('lang-dropdown').classList.remove('open'); }
+  document.addEventListener('click', e => { if (!document.getElementById('lang-wrapper').contains(e.target)) closeLangDropdown(); });
+
+  /* ══ EUROPE BOUNDS ══ */
+  const EUROPE_BOUNDS = { west:-25.0, east:45.0, south:30.0, north:72.0 };
+  function isInEurope(lat,lng) {
+    return lat>=EUROPE_BOUNDS.south && lat<=EUROPE_BOUNDS.north && lng>=EUROPE_BOUNDS.west && lng<=EUROPE_BOUNDS.east;
+  }
+  function showOobToast()  { document.getElementById('oob-toast').classList.add('visible'); }
+  function closeOobToast() { document.getElementById('oob-toast').classList.remove('visible'); }
+
+  /* ══ MAP STATE ══ */
+  let map, activeMarker, drawingCircle, tileLayer, blackoutLayer;
+  let isDrawingMode = false, reviewMarkers = [];
+
+  const LIGHT_TILES = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+  const DARK_TILES  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+
+  const POLLEN_TYPES = [
+    { key:'birch_pollen',   labelKey:'birch',   emoji:'🌳', color:'#ff4d7a' },
+    { key:'grass_pollen',   labelKey:'grass',   emoji:'🌿', color:'#4db8ff' },
+    { key:'ragweed_pollen', labelKey:'ragweed', emoji:'🌾', color:'#ffd54f' },
+    { key:'alder_pollen',   labelKey:'alder',   emoji:'🍃', color:'#a8e063' },
+    { key:'mugwort_pollen', labelKey:'mugwort', emoji:'🌱', color:'#c084fc' },
+  ];
+
+  let pollenByDay = {}, activeDayKey = null, activePollenType = 'all';
+
+  /* ══ SEVERITY TOOLTIP ══ */
+  function severityDesc(cls) {
+    const d = t('severity_desc');
+    if (cls==='tag-high') return d.high;
+    if (cls==='tag-mod')  return d.mod;
+    if (cls==='tag-low')  return d.low;
+    return d.none;
+  }
+  function severityColor(cls) {
+    if (cls==='tag-high') return '#ef9a9a';
+    if (cls==='tag-mod')  return '#ffd54f';
+    if (cls==='tag-low')  return '#81c784';
+    return 'rgba(200,200,200,0.5)';
+  }
+
+  /* ══ POLLEN TYPE FILTER ══ */
+  function renderPollenTypeFilter() {
+    const wrap = document.getElementById('pollen-type-filter');
+    wrap.innerHTML = '';
+    const allChip = document.createElement('button');
+    allChip.className = 'type-chip'+(activePollenType==='all'?' active':'');
+    allChip.textContent = t('all_types');
+    allChip.onclick = () => selectPollenType('all');
+    wrap.appendChild(allChip);
+    POLLEN_TYPES.forEach(pt => {
+      const chip = document.createElement('button');
+      chip.className = 'type-chip'+(activePollenType===pt.key?' active':'');
+      chip.textContent = pt.emoji+' '+(TRANSLATIONS[currentLang]?.pollen_types_labels?.[pt.labelKey]||pt.labelKey);
+      chip.onclick = () => selectPollenType(pt.key);
+      wrap.appendChild(chip);
     });
+  }
 
-    /* ─────────────────────────────────────
-       EUROPE BOUNDARY CHECK
-       W: -25°, E: 45°, S: 30°, N: 72°
-    ───────────────────────────────────── */
-    const EUROPE_BOUNDS = {
-      west:  -25.0,
-      east:   45.0,
-      south:  30.0,
-      north:  72.0
-    };
+  function selectPollenType(typeKey) {
+    activePollenType = typeKey;
+    renderPollenTypeFilter();
+    if (activeDayKey) { renderSummaryBar(activeDayKey); renderHourList(activeDayKey); }
+  }
 
-    function isInEurope(lat, lng) {
-      return lat >= EUROPE_BOUNDS.south &&
-             lat <= EUROPE_BOUNDS.north &&
-             lng >= EUROPE_BOUNDS.west  &&
-             lng <= EUROPE_BOUNDS.east;
-    }
+  /* ══ DATA HELPERS ══ */
+  function getCategory(val) {
+    if (val===null||val===undefined) return {label:t('cat_na'),cls:'tag-none'};
+    if (val>80)  return {label:t('cat_high'),cls:'tag-high'};
+    if (val>30)  return {label:t('cat_mod'), cls:'tag-mod'};
+    if (val>0)   return {label:t('cat_low'), cls:'tag-low'};
+    return             {label:t('cat_none'),cls:'tag-none'};
+  }
 
-    function showOobToast() {
-      document.getElementById('oob-toast').classList.add('visible');
-    }
+  function fmtHour(s) { return s.slice(11,16); }
 
-    function closeOobToast() {
-      document.getElementById('oob-toast').classList.remove('visible');
-    }
+  function fmtDateLabel(dayKey) {
+    const d = new Date(dayKey+'T12:00:00Z');
+    const today    = new Date().toISOString().slice(0,10);
+    const tomorrow = new Date(Date.now()+86400000).toISOString().slice(0,10);
+    if (dayKey===today)    return t('today');
+    if (dayKey===tomorrow) return t('tomorrow');
+    const lm = {en:'en',el:'el-GR',de:'de-DE',es:'es-ES'};
+    return d.toLocaleDateString(lm[currentLang]||'en',{weekday:'short',month:'short',day:'numeric',timeZone:'UTC'});
+  }
 
-    /* ─────────────────────────────────────
-       MAP & STATE
-    ───────────────────────────────────── */
-    let map, activeMarker, drawingCircle, tileLayer;
-    let isDrawingMode = false;
-    let reviewMarkers = [];
-
-    const LIGHT_TILES = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-    const DARK_TILES  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-
-    const POLLEN_TYPES = [
-      { key: 'birch_pollen',   label: 'Birch',   labelKey: 'birch',   emoji: '🌳' },
-      { key: 'grass_pollen',   label: 'Grass',   labelKey: 'grass',   emoji: '🌿' },
-      { key: 'ragweed_pollen', label: 'Ragweed', labelKey: 'ragweed', emoji: '🌾' },
-      { key: 'alder_pollen',   label: 'Alder',   labelKey: 'alder',   emoji: '🍃' },
-      { key: 'mugwort_pollen', label: 'Mugwort', labelKey: 'mugwort', emoji: '🌱' }
-    ];
-
-    let pollenByDay    = {};
-    let activeDayKey   = null;
-    let activePollenType = 'all'; // 'all' or one of POLLEN_TYPES[i].key
-
-    /* ─────────────────────────────────────
-       POLLEN TYPE FILTER
-    ───────────────────────────────────── */
-    function renderPollenTypeFilter() {
-      const wrap = document.getElementById('pollen-type-filter');
-      wrap.innerHTML = '';
-
-      // "All" chip
-      const allChip = document.createElement('button');
-      allChip.className = 'type-chip' + (activePollenType === 'all' ? ' active' : '');
-      allChip.textContent = t('all_types');
-      allChip.onclick = () => selectPollenType('all');
-      wrap.appendChild(allChip);
-
-      POLLEN_TYPES.forEach(pt => {
-        const chip = document.createElement('button');
-        chip.className = 'type-chip' + (activePollenType === pt.key ? ' active' : '');
-        chip.textContent = pt.emoji + ' ' + (TRANSLATIONS[currentLang]?.pollen_types_labels?.[pt.labelKey] || pt.label);
-        chip.onclick = () => selectPollenType(pt.key);
-        wrap.appendChild(chip);
+  function buildDayData(apiData) {
+    const times=apiData.hourly.time, result={};
+    times.forEach((t,i)=>{
+      const dayKey=t.slice(0,10);
+      if (!result[dayKey]) result[dayKey]=[];
+      const entry={time:t};
+      let any=false;
+      POLLEN_TYPES.forEach(pt=>{
+        const v=apiData.hourly[pt.key]?.[i];
+        entry[pt.key]=(v!==null&&v!==undefined)?v:null;
+        if (v!==null&&v!==undefined) any=true;
       });
-    }
+      if (any||result[dayKey].length>0) result[dayKey].push(entry);
+    });
+    Object.keys(result).forEach(day=>{
+      if (!result[day].some(h=>POLLEN_TYPES.some(pt=>h[pt.key]!==null))) delete result[day];
+    });
+    return result;
+  }
 
-    function selectPollenType(typeKey) {
-      activePollenType = typeKey;
-      renderPollenTypeFilter();
-      if (activeDayKey) {
-        renderSummaryBar(activeDayKey);
-        renderHourList(activeDayKey);
-      }
-    }
+  /* ══ RENDER PANEL ══ */
+  function renderDayTabs() {
+    const div=document.getElementById('day-tabs');
+    div.innerHTML='';
+    Object.keys(pollenByDay).forEach(dayKey=>{
+      const btn=document.createElement('button');
+      btn.className='day-tab'+(dayKey===activeDayKey?' active':'');
+      btn.textContent=fmtDateLabel(dayKey);
+      btn.onclick=()=>selectDay(dayKey);
+      div.appendChild(btn);
+    });
+  }
 
-    /* ─────────────────────────────────────
-       DATA HELPERS
-    ───────────────────────────────────── */
-    function getCategory(val) {
-      if (val === null || val === undefined) return { label: t('cat_na'),   cls: 'tag-none' };
-      if (val > 80)  return { label: t('cat_high'), cls: 'tag-high' };
-      if (val > 30)  return { label: t('cat_mod'),  cls: 'tag-mod'  };
-      if (val > 0)   return { label: t('cat_low'),  cls: 'tag-low'  };
-      return               { label: t('cat_none'), cls: 'tag-none' };
-    }
+  function getActivePollens() {
+    return activePollenType==='all' ? POLLEN_TYPES : POLLEN_TYPES.filter(p=>p.key===activePollenType);
+  }
 
-    function fmtHour(isoStr) { return isoStr.slice(11, 16); }
+  function renderSummaryBar(dayKey) {
+    const bar=document.getElementById('summary-bar'), hours=pollenByDay[dayKey]||[], types=getActivePollens().slice(0,4);
+    bar.style.display='flex';
+    bar.innerHTML=types.map(pt=>{
+      const vals=hours.map(h=>h[pt.key]).filter(v=>v!==null);
+      const peak=vals.length?Math.max(...vals):null;
+      const {cls}=getCategory(peak);
+      const label=TRANSLATIONS[currentLang]?.pollen_types_labels?.[pt.labelKey]||pt.labelKey;
+      return `<div class="sum-chip ${cls}"><span class="chip-name">${label}</span><span class="chip-val">${peak!==null?Math.round(peak):'–'}</span></div>`;
+    }).join('');
+  }
 
-    function fmtDateLabel(dateKey) {
-      const d = new Date(dateKey + 'T12:00:00Z');
-      const todayKey    = new Date().toISOString().slice(0, 10);
-      const tomorrowKey = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-      if (dateKey === todayKey)    return t('today');
-      if (dateKey === tomorrowKey) return t('tomorrow');
-      return d.toLocaleDateString(currentLang === 'el' ? 'el-GR' :
-                                  currentLang === 'de' ? 'de-DE' :
-                                  currentLang === 'es' ? 'es-ES' : 'en',
-        { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
-    }
-
-    function buildDayData(apiData) {
-      const times  = apiData.hourly.time;
-      const result = {};
-      times.forEach((t, i) => {
-        const dayKey = t.slice(0, 10);
-        if (!result[dayKey]) result[dayKey] = [];
-        const entry = { time: t };
-        let hasAnyData = false;
-        POLLEN_TYPES.forEach(pt => {
-          const val = apiData.hourly[pt.key]?.[i];
-          entry[pt.key] = (val !== null && val !== undefined) ? val : null;
-          if (val !== null && val !== undefined) hasAnyData = true;
-        });
-        if (hasAnyData || result[dayKey].length > 0) result[dayKey].push(entry);
-      });
-      Object.keys(result).forEach(day => {
-        const anyReal = result[day].some(h => POLLEN_TYPES.some(pt => h[pt.key] !== null));
-        if (!anyReal) delete result[day];
-      });
-      return result;
-    }
-
-    /* ─────────────────────────────────────
-       RENDER
-    ───────────────────────────────────── */
-    function renderDayTabs() {
-      const tabsDiv = document.getElementById('day-tabs');
-      tabsDiv.innerHTML = '';
-      Object.keys(pollenByDay).forEach(dayKey => {
-        const btn = document.createElement('button');
-        btn.className = 'day-tab' + (dayKey === activeDayKey ? ' active' : '');
-        btn.textContent = fmtDateLabel(dayKey);
-        btn.onclick = () => selectDay(dayKey);
-        tabsDiv.appendChild(btn);
-      });
-    }
-
-    function getActivePollens() {
-      return activePollenType === 'all'
-        ? POLLEN_TYPES
-        : POLLEN_TYPES.filter(p => p.key === activePollenType);
-    }
-
-    function renderSummaryBar(dayKey) {
-      const bar   = document.getElementById('summary-bar');
-      const hours = pollenByDay[dayKey] || [];
-      const types = getActivePollens().slice(0, 4);
-      bar.style.display = 'flex';
-      bar.innerHTML = types.map(pt => {
-        const vals = hours.map(h => h[pt.key]).filter(v => v !== null);
-        const peak = vals.length ? Math.max(...vals) : null;
-        const { cls } = getCategory(peak);
-        const label = TRANSLATIONS[currentLang]?.pollen_types_labels?.[pt.labelKey] || pt.label;
-        return `<div class="sum-chip ${cls}">
-          <span class="chip-name">${label}</span>
-          <span class="chip-val">${peak !== null ? Math.round(peak) : '–'}</span>
+  function renderHourList(dayKey) {
+    const listDiv=document.getElementById('pollen-list');
+    const hours=pollenByDay[dayKey]||[];
+    const display=hours.filter((_,i)=>i%3===0||i===hours.length-1);
+    const types=getActivePollens();
+    if (!display.length){listDiv.innerHTML=`<p class="loading-msg">${t('no_data_day')}</p>`;return;}
+    listDiv.innerHTML=display.map(h=>{
+      const rows=types.map(pt=>{
+        const val=h[pt.key];
+        const {label,cls}=getCategory(val);
+        const dispVal=val!==null?Math.round(val):'–';
+        const ptLabel=TRANSLATIONS[currentLang]?.pollen_types_labels?.[pt.labelKey]||pt.labelKey;
+        const desc=severityDesc(cls);
+        const col=severityColor(cls);
+        return `<div class="pollen-item">
+          <span class="pollen-label">${pt.emoji} ${ptLabel}
+            <span class="tag-wrap">
+              <span class="tag ${cls}">${label}</span>
+              <span class="tag-info" style="color:${col}">?<span class="tag-tooltip">${desc}</span></span>
+            </span>
+          </span>
+          <span class="pollen-val">${dispVal}</span>
         </div>`;
       }).join('');
+      return `<div class="hour-block"><div class="hour-label">⏱ ${fmtHour(h.time)}</div>${rows}</div>`;
+    }).join('');
+  }
+
+  function selectDay(dayKey) {
+    activeDayKey=dayKey;
+    renderDayTabs(); renderSummaryBar(dayKey); renderHourList(dayKey);
+  }
+
+  /* ══ MARKER ══ */
+  function pinSVG() {
+    return `<svg width="30" height="42" viewBox="0 0 30 42" xmlns="http://www.w3.org/2000/svg"><path d="M15 0C6.7 0 0 6.7 0 15C0 26.2 15 42 15 42C15 42 30 26.2 30 15C30 6.7 23.3 0 15 0Z" fill="#ff4d7a"/><circle cx="15" cy="15" r="6" fill="white" fill-opacity="0.9"/></svg>`;
+  }
+
+  /* ══ FETCH POLLEN ══ */
+  let lastLocLabel = null;
+
+  async function fetchAndDisplayPollen(lat, lng, locationLabel) {
+    lastLocLabel=locationLabel;
+    const reportDiv=document.getElementById('pollen-report');
+    const listDiv=document.getElementById('pollen-list');
+    const tabsDiv=document.getElementById('day-tabs');
+    const bar=document.getElementById('summary-bar');
+
+    reportDiv.style.display='flex';
+    tabsDiv.innerHTML=''; bar.style.display='none';
+    listDiv.innerHTML=`<p class="loading-msg">${t('fetching')}</p>`;
+    document.getElementById('report-loc').textContent=locationLabel||`${lat.toFixed(3)}°N  ${lng.toFixed(3)}°E`;
+
+    if (activeMarker) { activeMarker.setLatLng([lat,lng]); }
+    else {
+      activeMarker=L.marker([lat,lng],{icon:L.divIcon({className:'',html:pinSVG(),iconSize:[30,42],iconAnchor:[15,42]})}).addTo(map);
     }
 
-    function renderHourList(dayKey) {
-      const listDiv = document.getElementById('pollen-list');
-      const hours   = pollenByDay[dayKey] || [];
-      const display = hours.filter((_, i) => i % 3 === 0 || i === hours.length - 1);
-      const types   = getActivePollens();
+    try {
+      const pollenKeys=POLLEN_TYPES.map(p=>p.key).join(',');
+      const url=`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&hourly=${pollenKeys}&forecast_days=5&timezone=auto`;
+      const resp=await fetch(url);
+      if (!resp.ok) throw new Error('API error '+resp.status);
+      const data=await resp.json();
+      pollenByDay=buildDayData(data);
+      const days=Object.keys(pollenByDay);
+      if (!days.length){listDiv.innerHTML=`<p class="loading-msg">${t('no_data')}</p>`;return;}
+      const todayKey=new Date().toISOString().slice(0,10);
+      activeDayKey=days.includes(todayKey)?todayKey:days[0];
+      renderPollenTypeFilter(); renderDayTabs(); renderSummaryBar(activeDayKey); renderHourList(activeDayKey);
+    } catch(err){
+      listDiv.innerHTML=`<p class="loading-msg">${t('fetch_error')}<br><small>${err.message}</small></p>`;
+    }
+  }
 
-      if (!display.length) {
-        listDiv.innerHTML = `<p class="loading-msg">${t('no_data_day')}</p>`;
-        return;
-      }
+  /* ══ MAP CLICK ══ */
+  async function onMapClick(e) {
+    if (isDrawingMode) return;
+    const {lat,lng}=e.latlng;
+    if (!isInEurope(lat,lng)){showOobToast();return;}
+    await fetchAndDisplayPollen(lat,lng,`${lat.toFixed(3)}°N  ${lng.toFixed(3)}°E`);
+  }
 
-      listDiv.innerHTML = display.map(h => {
-        const rows = types.map(pt => {
-          const val = h[pt.key];
-          const { label, cls } = getCategory(val);
-          const dispVal = val !== null ? Math.round(val) : '–';
-          const ptLabel = TRANSLATIONS[currentLang]?.pollen_types_labels?.[pt.labelKey] || pt.label;
-          return `<div class="pollen-item">
-            <span class="pollen-label">${pt.emoji} ${ptLabel}<span class="tag ${cls}">${label}</span></span>
-            <span class="pollen-val">${dispVal}</span>
-          </div>`;
-        }).join('');
+  /* ══ SEARCH ══ */
+  let searchTimeout=null;
+  document.addEventListener('DOMContentLoaded',()=>{
+    const input=document.getElementById('search-input');
+    input.addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
+    input.addEventListener('input',()=>{
+      clearTimeout(searchTimeout);
+      const q=input.value.trim();
+      if (q.length<2){document.getElementById('search-results').style.display='none';return;}
+      searchTimeout=setTimeout(()=>doSearch(true),500);
+    });
+  });
 
-        return `<div class="hour-block">
-          <div class="hour-label">⏱ ${fmtHour(h.time)}</div>
-          ${rows}
+  async function doSearch(autocomplete=false) {
+    const input=document.getElementById('search-input');
+    const q=input.value.trim();
+    if (!q) return;
+    const resultsDiv=document.getElementById('search-results');
+    resultsDiv.style.display='block';
+    resultsDiv.innerHTML=`<div class="search-result-item"><span class="result-name">${t('searching')}</span></div>`;
+    try {
+      const url=`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=1`;
+      const resp=await fetch(url,{headers:{'Accept-Language':currentLang}});
+      const data=await resp.json();
+      if (!data.length){resultsDiv.innerHTML=`<div class="search-result-item"><span class="result-name">${t('no_results')}</span></div>`;return;}
+      resultsDiv.innerHTML=data.map(r=>{
+        const name=r.display_name.split(',')[0];
+        const country=r.address?.country||r.display_name.split(',').slice(-1)[0].trim();
+        return `<div class="search-result-item" onclick="selectSearchResult(${r.lat},${r.lon},'${name.replace(/'/g,"\\'")}')" >
+          <span class="result-icon">📍</span><span class="result-name">${name}</span><span class="result-country">${country}</span>
         </div>`;
       }).join('');
+    } catch(err){
+      resultsDiv.innerHTML=`<div class="search-result-item"><span class="result-name">⚠ Error</span></div>`;
     }
+  }
 
-    function selectDay(dayKey) {
-      activeDayKey = dayKey;
-      renderDayTabs();
-      renderSummaryBar(dayKey);
-      renderHourList(dayKey);
-    }
+  function selectSearchResult(lat,lng,name){
+    document.getElementById('search-results').style.display='none';
+    document.getElementById('search-input').value=name;
+    lat=parseFloat(lat); lng=parseFloat(lng);
+    if (!isInEurope(lat,lng)){showOobToast();return;}
+    map.setView([lat,lng],10,{animate:true});
+    fetchAndDisplayPollen(lat,lng,name);
+  }
 
-    /* ─────────────────────────────────────
-       MARKER
-    ───────────────────────────────────── */
-    function pinSVG() {
-      return `<svg width="30" height="42" viewBox="0 0 30 42" xmlns="http://www.w3.org/2000/svg">
-        <path d="M15 0C6.7 0 0 6.7 0 15C0 26.2 15 42 15 42C15 42 30 26.2 30 15C30 6.7 23.3 0 15 0Z" fill="#ff4d7a"/>
-        <circle cx="15" cy="15" r="6" fill="white" fill-opacity="0.9"/>
-      </svg>`;
-    }
+  /* ══ CHART MODAL ══ */
+  let pollenChart=null;
+  let chartSelectedTypes=new Set(POLLEN_TYPES.map(p=>p.key));
+  let chartSelectedDays=new Set();
 
-    /* ─────────────────────────────────────
-       FETCH POLLEN DATA
-    ───────────────────────────────────── */
-    async function fetchAndDisplayPollen(lat, lng, locationLabel) {
-      const reportDiv = document.getElementById('pollen-report');
-      const listDiv   = document.getElementById('pollen-list');
-      const tabsDiv   = document.getElementById('day-tabs');
-      const bar       = document.getElementById('summary-bar');
+  function openChartModal() {
+    if (!Object.keys(pollenByDay).length) return;
+    chartSelectedDays=new Set([activeDayKey]);
 
-      reportDiv.style.display = 'flex';
-      tabsDiv.innerHTML   = '';
-      bar.style.display   = 'none';
-      listDiv.innerHTML   = `<p class="loading-msg">${t('fetching')}</p>`;
-      document.getElementById('report-loc').textContent = locationLabel ||
-        `${lat.toFixed(3)}°N  ${lng.toFixed(3)}°E`;
-
-      if (activeMarker) {
-        activeMarker.setLatLng([lat, lng]);
-      } else {
-        activeMarker = L.marker([lat, lng], {
-          icon: L.divIcon({
-            className: '',
-            html: pinSVG(),
-            iconSize: [30, 42],
-            iconAnchor: [15, 42]
-          })
-        }).addTo(map);
-      }
-
-      try {
-        const pollenKeys = POLLEN_TYPES.map(p => p.key).join(',');
-        const url = `https://air-quality-api.open-meteo.com/v1/air-quality` +
-          `?latitude=${lat}&longitude=${lng}` +
-          `&hourly=${pollenKeys}` +
-          `&forecast_days=5` +
-          `&timezone=auto`;
-
-        const resp = await fetch(url);
-        if (!resp.ok) throw new Error('API error ' + resp.status);
-        const data = await resp.json();
-
-        pollenByDay = buildDayData(data);
-        const days  = Object.keys(pollenByDay);
-
-        if (!days.length) {
-          listDiv.innerHTML = `<p class="loading-msg">${t('no_data')}</p>`;
-          return;
-        }
-
-        const todayKey = new Date().toISOString().slice(0, 10);
-        activeDayKey   = days.includes(todayKey) ? todayKey : days[0];
-
-        renderPollenTypeFilter();
-        renderDayTabs();
-        renderSummaryBar(activeDayKey);
-        renderHourList(activeDayKey);
-
-      } catch (err) {
-        listDiv.innerHTML = `<p class="loading-msg">${t('fetch_error')}<br><small>${err.message}</small></p>`;
-      }
-    }
-
-    /* ─────────────────────────────────────
-       MAP CLICK
-    ───────────────────────────────────── */
-    async function onMapClick(e) {
-      if (isDrawingMode) return;
-      const { lat, lng } = e.latlng;
-
-      if (!isInEurope(lat, lng)) {
-        showOobToast();
-        return;
-      }
-
-      await fetchAndDisplayPollen(lat, lng, `${lat.toFixed(3)}°N  ${lng.toFixed(3)}°E`);
-    }
-
-    /* ─────────────────────────────────────
-       SEARCH
-    ───────────────────────────────────── */
-    let searchTimeout = null;
-
-    document.addEventListener('DOMContentLoaded', () => {
-      const input = document.getElementById('search-input');
-      input.addEventListener('keydown', e => {
-        if (e.key === 'Enter') doSearch();
-      });
-      input.addEventListener('input', () => {
-        clearTimeout(searchTimeout);
-        const q = input.value.trim();
-        if (q.length < 2) {
-          document.getElementById('search-results').style.display = 'none';
-          return;
-        }
-        searchTimeout = setTimeout(() => doSearch(true), 500);
-      });
-    });
-
-    async function doSearch(autocomplete = false) {
-      const input = document.getElementById('search-input');
-      const q     = input.value.trim();
-      if (!q) return;
-
-      const resultsDiv = document.getElementById('search-results');
-      resultsDiv.style.display = 'block';
-      resultsDiv.innerHTML = `<div class="search-result-item"><span class="result-name">${t('searching')}</span></div>`;
-
-      try {
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=1`;
-        const resp = await fetch(url, { headers: { 'Accept-Language': currentLang } });
-        const data = await resp.json();
-
-        if (!data.length) {
-          resultsDiv.innerHTML = `<div class="search-result-item"><span class="result-name">${t('no_results')}</span></div>`;
-          return;
-        }
-
-        resultsDiv.innerHTML = data.map((r, i) => {
-          const name    = r.display_name.split(',')[0];
-          const country = r.address?.country || r.display_name.split(',').slice(-1)[0].trim();
-          return `<div class="search-result-item" onclick="selectSearchResult(${r.lat}, ${r.lon}, '${name.replace(/'/g, "\\'")}')">
-            <span class="result-icon">📍</span>
-            <span class="result-name">${name}</span>
-            <span class="result-country">${country}</span>
-          </div>`;
-        }).join('');
-
-      } catch(err) {
-        resultsDiv.innerHTML = `<div class="search-result-item"><span class="result-name">⚠ Error</span></div>`;
-      }
-    }
-
-    function selectSearchResult(lat, lng, name) {
-      document.getElementById('search-results').style.display = 'none';
-      document.getElementById('search-input').value = name;
-
-      lat = parseFloat(lat);
-      lng = parseFloat(lng);
-
-      if (!isInEurope(lat, lng)) {
-        showOobToast();
-        return;
-      }
-
-      map.setView([lat, lng], 10, { animate: true });
-      fetchAndDisplayPollen(lat, lng, name);
-    }
-
-    /* ─────────────────────────────────────
-       MAP INIT
-    ───────────────────────────────────── */
-    function initMap() {
-      // Restrict map to Europe bounds
-      const europeBounds = L.latLngBounds(
-        L.latLng(EUROPE_BOUNDS.south, EUROPE_BOUNDS.west),
-        L.latLng(EUROPE_BOUNDS.north, EUROPE_BOUNDS.east)
-      );
-
-      map = L.map('map', {
-        zoomControl: false,
-        maxBounds: europeBounds,
-        maxBoundsViscosity: 0.85,
-        minZoom: 3
-      }).setView([48.85, 2.35], 5);
-
-      tileLayer = L.tileLayer(DARK_TILES, {
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-        subdomains: 'abcd',
-        maxZoom: 19
-      }).addTo(map);
-
-      map.on('click', onMapClick);
-
-      document.getElementById('theme-toggle').addEventListener('change', (e) => {
-        if (e.target.checked) {
-          document.body.classList.add('light-theme');
-          tileLayer.setUrl(LIGHT_TILES);
-        } else {
-          document.body.classList.remove('light-theme');
-          tileLayer.setUrl(DARK_TILES);
-        }
-      });
-
-      document.getElementById('drawAreaBtn').addEventListener('click', toggleDrawingMode);
-      loadReviews();
-      renderPollenTypeFilter();
-    }
-
-    /* ─────────────────────────────────────
-       REVIEWS
-    ───────────────────────────────────── */
-    async function loadReviews() {
-      reviewMarkers.forEach(m => map.removeLayer(m));
-      reviewMarkers = [];
-      try {
-        const res  = await fetch('/api/reviews');
-        const data = await res.json();
-        if (data.success && Array.isArray(data.reviews)) {
-          data.reviews.forEach(r => {
-            const m = L.marker([r.center_lat, r.center_lng], {
-              icon: L.icon({ iconUrl: '/static/point.png', iconSize: [40, 40], iconAnchor: [20, 20] })
-            }).addTo(map);
-            m.bindPopup(`<b>Review</b><br>${r.review_text}`);
-            reviewMarkers.push(m);
-          });
-        }
-      } catch (e) {
-        console.error('Could not load reviews:', e);
-      }
-    }
-
-    function toggleDrawingMode() {
-      isDrawingMode = !isDrawingMode;
-      const btn = document.getElementById('drawAreaBtn');
-      if (isDrawingMode) {
-        btn.textContent = t('draw_btn_active');
-        btn.classList.add('active-draw');
-        map.off('click', onMapClick);
-        map.once('click', (e) => {
-          drawingCircle = L.circle(e.latlng, {
-            radius: 2500, color: '#ff4d7a', fillOpacity: 0.2, weight: 2
-          }).addTo(map);
-          openReviewModal(e.latlng);
-          isDrawingMode = false;
-          btn.textContent = t('draw_btn');
-          btn.classList.remove('active-draw');
-        });
-      } else {
-        btn.textContent = t('draw_btn');
-        btn.classList.remove('active-draw');
-        map.off('click');
-        map.on('click', onMapClick);
-      }
-    }
-
-    function openReviewModal(latlng) {
-      document.getElementById('area-summary').textContent =
-        `Lat: ${latlng.lat.toFixed(4)}  |  Lng: ${latlng.lng.toFixed(4)}`;
-      document.getElementById('rev-text').value = '';
-      document.getElementById('review-modal').classList.add('visible');
-      window.currentLatlng = latlng;
-    }
-
-    function closeReviewModal() {
-      document.getElementById('review-modal').classList.remove('visible');
-      if (drawingCircle) { map.removeLayer(drawingCircle); drawingCircle = null; }
-      map.off('click');
-      map.on('click', onMapClick);
-    }
-
-    async function submitReview() {
-      const reviewText = document.getElementById('rev-text').value.trim();
-      if (!reviewText) return;
-      const payload = {
-        centerLat:  window.currentLatlng.lat,
-        centerLng:  window.currentLatlng.lng,
-        radiusKm:   2.5,
-        reviewText
+    const typesWrap=document.getElementById('chart-type-chips');
+    typesWrap.innerHTML='';
+    POLLEN_TYPES.forEach(pt=>{
+      const chip=document.createElement('button');
+      chip.className='chart-chip'+(chartSelectedTypes.has(pt.key)?' active':'');
+      chip.textContent=pt.emoji+' '+(TRANSLATIONS[currentLang]?.pollen_types_labels?.[pt.labelKey]||pt.labelKey);
+      chip.onclick=()=>{
+        if (chartSelectedTypes.has(pt.key)) chartSelectedTypes.delete(pt.key);
+        else chartSelectedTypes.add(pt.key);
+        chip.classList.toggle('active');
       };
-      try {
-        const res    = await fetch('/api/reviews', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const result = await res.json();
-        if (result.success) { closeReviewModal(); loadReviews(); }
-      } catch (e) {
-        console.error('Submit failed:', e);
-      }
-    }
+      typesWrap.appendChild(chip);
+    });
 
-    window.onload = initMap;
+    const daysWrap=document.getElementById('chart-day-chips');
+    daysWrap.innerHTML='';
+    Object.keys(pollenByDay).forEach(dayKey=>{
+      const chip=document.createElement('button');
+      chip.className='chart-chip'+(chartSelectedDays.has(dayKey)?' active':'');
+      chip.textContent=fmtDateLabel(dayKey);
+      chip.onclick=()=>{
+        if (chartSelectedDays.has(dayKey)) chartSelectedDays.delete(dayKey);
+        else chartSelectedDays.add(dayKey);
+        chip.classList.toggle('active');
+      };
+      daysWrap.appendChild(chip);
+    });
+
+    document.getElementById('chart-modal-loc').textContent=lastLocLabel||'';
+    document.getElementById('chart-modal').classList.add('visible');
+    document.getElementById('chart-placeholder').style.display='block';
+    document.getElementById('pollen-chart').style.display='none';
+    if (pollenChart){pollenChart.destroy();pollenChart=null;}
+  }
+
+  function closeChartModal() {
+    document.getElementById('chart-modal').classList.remove('visible');
+    if (pollenChart){pollenChart.destroy();pollenChart=null;}
+  }
+
+  function renderChart() {
+    if (!chartSelectedTypes.size||!chartSelectedDays.size) return;
+    const isLight=document.body.classList.contains('light-theme');
+    const gridColor=isLight?'rgba(0,0,0,0.07)':'rgba(255,255,255,0.07)';
+    const labelColor=isLight?'#1a1e21':'#e8edf0';
+
+    const sortedDays=Object.keys(pollenByDay).filter(d=>chartSelectedDays.has(d)).sort();
+    const allPoints=[];
+    sortedDays.forEach(dayKey=>{
+      const hours=pollenByDay[dayKey]||[];
+      const display=hours.filter((_,i)=>i%3===0||i===hours.length-1);
+      display.forEach(h=>allPoints.push({label:fmtDateLabel(dayKey)+' '+fmtHour(h.time),hour:h}));
+    });
+
+    const labels=allPoints.map(p=>p.label);
+    const datasets=POLLEN_TYPES.filter(pt=>chartSelectedTypes.has(pt.key)).map(pt=>{
+      const ptLabel=TRANSLATIONS[currentLang]?.pollen_types_labels?.[pt.labelKey]||pt.labelKey;
+      return {
+        label:pt.emoji+' '+ptLabel,
+        data:allPoints.map(p=>{ const v=p.hour[pt.key]; return v!==null?Math.round(v):null; }),
+        borderColor:pt.color, backgroundColor:pt.color+'22',
+        borderWidth:2, pointRadius:3, pointHoverRadius:6, tension:0.35, fill:false, spanGaps:true
+      };
+    });
+
+    document.getElementById('chart-placeholder').style.display='none';
+    const canvas=document.getElementById('pollen-chart');
+    canvas.style.display='block';
+    if (pollenChart){pollenChart.destroy();pollenChart=null;}
+
+    pollenChart=new Chart(canvas,{
+      type:'line', data:{labels,datasets},
+      options:{
+        responsive:true, maintainAspectRatio:true, aspectRatio:2.2,
+        interaction:{mode:'index',intersect:false},
+        plugins:{
+          legend:{labels:{color:labelColor,font:{family:"'Space Mono', monospace",size:10},boxWidth:14,padding:14}},
+          tooltip:{
+            backgroundColor:'rgba(6,14,18,0.92)',titleColor:'#ff4d7a',bodyColor:'#e8edf0',
+            borderColor:'rgba(255,77,122,0.4)',borderWidth:1,
+            titleFont:{family:"'Space Mono', monospace",size:10},
+            bodyFont:{family:"'Space Mono', monospace",size:10},
+            callbacks:{
+              afterBody(ctx){
+                const v=ctx[0]?.raw;
+                if (v===null||v===undefined) return;
+                if (v>80) return ['→ HIGH — severe allergy risk'];
+                if (v>30) return ['→ MODERATE — possible symptoms'];
+                if (v>0)  return ['→ LOW — mild risk'];
+                return ['→ NONE'];
+              }
+            }
+          }
+        },
+        scales:{
+          x:{ticks:{color:labelColor,font:{family:"'Space Mono', monospace",size:9},maxRotation:45,autoSkip:true,maxTicksLimit:16},grid:{color:gridColor}},
+          y:{title:{display:true,text:'grains/m³',color:'#ff4d7a',font:{family:"'Space Mono', monospace",size:10}},
+             ticks:{color:labelColor,font:{family:"'Space Mono', monospace",size:9}},grid:{color:gridColor},min:0}
+        }
+      }
+    });
+  }
+
+  /* ══ EUROPE BLACKOUT OVERLAY ══ */
+  function addEuropeBlackout() {
+    const EuropeMaskLayer = L.Layer.extend({
+      onAdd(map) {
+        this._map=map;
+        const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+        svg.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:300;';
+        this._svg=svg;
+        map.getPanes().overlayPane.appendChild(svg);
+        map.on('move zoom viewreset moveend zoomend',this._update,this);
+        this._update();
+      },
+      onRemove(map){
+        map.getPanes().overlayPane.removeChild(this._svg);
+        map.off('move zoom viewreset moveend zoomend',this._update,this);
+      },
+      _update(){
+        const map=this._map, svg=this._svg, size=map.getSize();
+        svg.setAttribute('width',size.x);
+        svg.setAttribute('height',size.y);
+        svg.setAttribute('viewBox',`0 0 ${size.x} ${size.y}`);
+        const nw=map.latLngToContainerPoint([EUROPE_BOUNDS.north,EUROPE_BOUNDS.west]);
+        const se=map.latLngToContainerPoint([EUROPE_BOUNDS.south,EUROPE_BOUNDS.east]);
+        const rx=Math.min(nw.x,se.x), ry=Math.min(nw.y,se.y);
+        const rw=Math.abs(se.x-nw.x), rh=Math.abs(se.y-nw.y);
+        // evenodd: world rect minus Europe hole = dark outside Europe
+        const path=`M0,0 H${size.x} V${size.y} H0 Z M${rx},${ry} H${rx+rw} V${ry+rh} H${rx} Z`;
+        svg.innerHTML=`<path d="${path}" fill="rgba(3,9,14,0.86)" fill-rule="evenodd"/>
+          <rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="none" stroke="rgba(255,77,122,0.22)" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+      }
+    });
+    blackoutLayer=new EuropeMaskLayer();
+    blackoutLayer.addTo(map);
+  }
+
+  /* ══ MAP INIT ══ */
+  function initMap() {
+    const europeBounds=L.latLngBounds(
+      L.latLng(EUROPE_BOUNDS.south,EUROPE_BOUNDS.west),
+      L.latLng(EUROPE_BOUNDS.north,EUROPE_BOUNDS.east)
+    );
+
+    map=L.map('map',{
+      zoomControl:false,
+      maxBounds:europeBounds,
+      maxBoundsViscosity:1.0,   // hard wall — cannot pan outside
+      minZoom:4,                // cannot zoom out far enough to see outside
+    }).setView([48.85,2.35],5);
+
+    // Fit to Europe so viewport never starts outside
+    map.fitBounds(europeBounds,{padding:[6,6]});
+
+    tileLayer=L.tileLayer(DARK_TILES,{
+      attribution:'&copy; OpenStreetMap contributors &copy; CARTO',
+      subdomains:'abcd', maxZoom:19
+    }).addTo(map);
+
+    // Dark overlay for everything outside Europe
+    addEuropeBlackout();
+
+    map.on('click',onMapClick);
+
+    document.getElementById('theme-toggle').addEventListener('change',e=>{
+      if (e.target.checked){document.body.classList.add('light-theme');tileLayer.setUrl(LIGHT_TILES);}
+      else {document.body.classList.remove('light-theme');tileLayer.setUrl(DARK_TILES);}
+    });
+
+    document.getElementById('drawAreaBtn').addEventListener('click',toggleDrawingMode);
+    loadReviews();
+    renderPollenTypeFilter();
+  }
+
+  /* ══ REVIEWS ══ */
+  async function loadReviews(){
+    reviewMarkers.forEach(m=>map.removeLayer(m)); reviewMarkers=[];
+    try {
+      const res=await fetch('/api/reviews'), data=await res.json();
+      if (data.success&&Array.isArray(data.reviews)){
+        data.reviews.forEach(r=>{
+          const m=L.marker([r.center_lat,r.center_lng],{icon:L.icon({iconUrl:'/static/point.png',iconSize:[40,40],iconAnchor:[20,20]})}).addTo(map);
+          m.bindPopup(`<b>Review</b><br>${r.review_text}`);
+          reviewMarkers.push(m);
+        });
+      }
+    } catch(e){console.error('Could not load reviews:',e);}
+  }
+
+  function toggleDrawingMode(){
+    isDrawingMode=!isDrawingMode;
+    const btn=document.getElementById('drawAreaBtn');
+    if (isDrawingMode){
+      btn.textContent=t('draw_btn_active'); btn.classList.add('active-draw');
+      map.off('click',onMapClick);
+      map.once('click',e=>{
+        drawingCircle=L.circle(e.latlng,{radius:2500,color:'#ff4d7a',fillOpacity:0.2,weight:2}).addTo(map);
+        openReviewModal(e.latlng);
+        isDrawingMode=false; btn.textContent=t('draw_btn'); btn.classList.remove('active-draw');
+      });
+    } else {
+      btn.textContent=t('draw_btn'); btn.classList.remove('active-draw');
+      map.off('click'); map.on('click',onMapClick);
+    }
+  }
+
+  function openReviewModal(latlng){
+    document.getElementById('area-summary').textContent=`Lat: ${latlng.lat.toFixed(4)}  |  Lng: ${latlng.lng.toFixed(4)}`;
+    document.getElementById('rev-text').value='';
+    document.getElementById('review-modal').classList.add('visible');
+    window.currentLatlng=latlng;
+  }
+
+  function closeReviewModal(){
+    document.getElementById('review-modal').classList.remove('visible');
+    if (drawingCircle){map.removeLayer(drawingCircle);drawingCircle=null;}
+    map.off('click'); map.on('click',onMapClick);
+  }
+
+  async function submitReview(){
+    const reviewText=document.getElementById('rev-text').value.trim();
+    if (!reviewText) return;
+    const payload={centerLat:window.currentLatlng.lat,centerLng:window.currentLatlng.lng,radiusKm:2.5,reviewText};
+    try {
+      const res=await fetch('/api/reviews',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const result=await res.json();
+      if (result.success){closeReviewModal();loadReviews();}
+    } catch(e){console.error('Submit failed:',e);}
+  }
+
+  window.onload=initMap;
   </script>
 </body>
 </html>
