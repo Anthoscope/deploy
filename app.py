@@ -59,7 +59,7 @@ async def fetch_one(session, lat, lng, day_str):
     except Exception:
         return None
 
-async def fetch_all_points(points, day_str, concurrency=40):
+async def fetch_all_points(points, day_str, concurrency=15):
     sem = asyncio.Semaphore(concurrency)
     connector = aiohttp.TCPConnector(limit=concurrency)
 
