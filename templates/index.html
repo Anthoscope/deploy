@@ -594,7 +594,7 @@
 
     try {
       const pollenKeys=POLLEN_TYPES.map(p=>p.key).join(',');
-      const url=`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&hourly=${pollenKeys}&forecast_days=5&timezone=auto`;
+      const url=`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&hourly=${pollenKeys}&forecast_days=6&timezone=auto`;
       const resp=await fetch(url);
       if (!resp.ok) throw new Error('API error '+resp.status);
       const data=await resp.json();
