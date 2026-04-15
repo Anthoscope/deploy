@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
   <script defer src="/_vercel/insights/script.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 
@@ -41,6 +42,21 @@
     #logo-container img { width: 100%; height: auto; display: block; filter: drop-shadow(0 0 12px var(--pink-glow)); }
 
     #top-right-controls { position: absolute; top: 24px; right: 20px; z-index: 1000; display: flex; align-items: center; gap: 10px; }
+
+    /* Heatmap toggle knob */
+    #heatmap-wrap { position:relative;display:inline-flex;flex-direction:column;align-items:center;gap:3px; }
+    #heatmap-btn { display:flex;align-items:center;justify-content:center;gap:5px; background:var(--surface);border:1px solid var(--border);border-radius:10px; padding:5px 10px;color:var(--muted);font-family:'Space Mono',monospace;font-size:0.65rem;font-weight:700; backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px); transition:all 0.2s;white-space:nowrap;height:32px;letter-spacing:0.5px;text-transform:uppercase; }
+    #heatmap-btn:hover { border-color:rgba(255,77,122,0.5);color:var(--text); }
+    #heatmap-btn.active { border-color:var(--pink);color:var(--pink);background:var(--pink-dim);box-shadow:0 0 12px rgba(255,77,122,0.25); }
+    #heatmap-btn .hm-dot { width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0;transition:background 0.2s; }
+    /* Heatmap pollen type sub-selector (appears below button when active) */
+    #heatmap-type-selector { display:none;position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,0.5);min-width:150px;z-index:2000;padding:6px; }
+    #heatmap-type-selector.open { display:block; }
+    .hm-type-row { padding:7px 10px;font-size:0.68rem;font-weight:700;color:var(--muted);font-family:'Space Mono',monospace;letter-spacing:0.5px;text-transform:uppercase;border-radius:6px;transition:all 0.15s;display:flex;align-items:center;gap:8px; }
+    .hm-type-row:hover { background:var(--pink-dim);color:var(--text); }
+    .hm-type-row.active { background:var(--pink-dim);color:var(--pink); }
+    /* Heatmap status bar */
+    #heatmap-status { display:none;position:absolute;bottom:70px;left:50%;transform:translateX(-50%);z-index:1001;background:var(--surface);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:20px;padding:8px 18px;font-family:'Space Mono',monospace;font-size:0.65rem;color:var(--pink);letter-spacing:0.5px;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.4); }
 
     .theme-switch { position: relative; display: inline-block; width: 64px; height: 32px; flex-shrink: 0; }
     .theme-switch input { opacity: 0; width: 0; height: 0; }
@@ -185,6 +201,20 @@
   </div>
 
   <div id="top-right-controls">
+    <div id="heatmap-wrap">
+      <button id="heatmap-btn" onclick="toggleHeatmapMenu()">
+        <span class="hm-dot"></span>
+        <span id="heatmap-btn-label">Heatmap</span>
+      </button>
+      <div id="heatmap-type-selector">
+        <div class="hm-day-row" style="padding:4px 10px 6px;font-size:0.6rem;color:var(--muted);font-family:'Space Mono',monospace;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border);margin-bottom:4px;">Pollen Type</div>
+        <div class="hm-type-row active" data-key="birch_pollen"    onclick="selectHeatmapType('birch_pollen')">🌳 Birch</div>
+        <div class="hm-type-row"        data-key="grass_pollen"    onclick="selectHeatmapType('grass_pollen')">🌿 Grass</div>
+        <div class="hm-type-row"        data-key="ragweed_pollen"  onclick="selectHeatmapType('ragweed_pollen')">🌾 Ragweed</div>
+        <div class="hm-type-row"        data-key="alder_pollen"    onclick="selectHeatmapType('alder_pollen')">🍃 Alder</div>
+        <div class="hm-type-row"        data-key="mugwort_pollen"  onclick="selectHeatmapType('mugwort_pollen')">🌱 Mugwort</div>
+      </div>
+    </div>
     <div id="lang-wrapper">
       <button id="lang-btn" onclick="toggleLangDropdown()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -227,6 +257,7 @@
   </div>
 
   <div class="hint" id="hint-text">📍 Tap anywhere on the map to inspect local pollen levels</div>
+  <div id="heatmap-status">🔥 Loading heatmap…</div>
   <button id="drawAreaBtn">Draw Area &amp; Review</button>
   <div id="map"></div>
 
@@ -594,7 +625,7 @@
 
     try {
       const pollenKeys=POLLEN_TYPES.map(p=>p.key).join(',');
-      const url=`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&hourly=${pollenKeys}&forecast_days=6&timezone=auto`;
+      const url=`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&hourly=${pollenKeys}&forecast_days=5&timezone=auto`;
       const resp=await fetch(url);
       if (!resp.ok) throw new Error('API error '+resp.status);
       const data=await resp.json();
@@ -902,6 +933,197 @@
       if (result.success){closeReviewModal();loadReviews();}
     } catch(e){console.error('Submit failed:',e);}
   }
+
+  /* ══ HEATMAP ══════════════════════════════════════════════════════════════ */
+  // State
+  let heatmapActive     = false;
+  let heatmapLayer      = null;          // current L.heatLayer on the map
+  let heatmapType       = 'birch_pollen';
+  let heatmapDayKey     = null;          // ISO date string e.g. "2025-04-16"
+  let heatmapLoading    = false;
+  // Client-side cache: "dayKey::type" → [[lat,lng,val],…]
+  const hmCache = {};
+
+  // Pollen-type gradient palettes (green → yellow → red)
+  const HM_GRADIENT = {
+    birch_pollen:   { 0.0:'#00000000', 0.2:'#7fff7f', 0.5:'#ffd700', 0.8:'#ff4500', 1.0:'#8b0000' },
+    grass_pollen:   { 0.0:'#00000000', 0.2:'#7fffff', 0.5:'#00bfff', 0.8:'#1e90ff', 1.0:'#00008b' },
+    ragweed_pollen: { 0.0:'#00000000', 0.2:'#ffff7f', 0.5:'#ffa500', 0.8:'#ff4500', 1.0:'#8b0000' },
+    alder_pollen:   { 0.0:'#00000000', 0.2:'#adff2f', 0.5:'#32cd32', 0.8:'#006400', 1.0:'#003200' },
+    mugwort_pollen: { 0.0:'#00000000', 0.2:'#e0b0ff', 0.5:'#c084fc', 0.8:'#7c3aed', 1.0:'#3b0764' },
+  };
+
+  // Build sorted day list from today → today+5 (ISO strings)
+  function hmDayOptions() {
+    const days = [];
+    const today = new Date();
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      days.push(d.toISOString().slice(0, 10));
+    }
+    return days;
+  }
+
+  function hmDayLabel(iso) {
+    const today = new Date().toISOString().slice(0, 10);
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    if (iso === today)    return t('today');
+    if (iso === tomorrow) return t('tomorrow');
+    const d = new Date(iso + 'T12:00:00Z');
+    return d.toLocaleDateString(currentLang === 'el' ? 'el-GR' : currentLang === 'de' ? 'de-DE' : currentLang === 'es' ? 'es-ES' : 'en-GB',
+      { month: 'short', day: 'numeric' });
+  }
+
+  // Toggle the heatmap menu open/closed
+  function toggleHeatmapMenu() {
+    const menu = document.getElementById('heatmap-type-selector');
+    const isOpen = menu.classList.contains('open');
+    if (isOpen) {
+      menu.classList.remove('open');
+    } else {
+      // Build day sub-rows inside menu if not yet built
+      buildHeatmapMenu();
+      menu.classList.add('open');
+    }
+    // Close other dropdowns
+    closeLangDropdown();
+  }
+
+  function buildHeatmapMenu() {
+    // Remove existing day rows
+    const menu = document.getElementById('heatmap-type-selector');
+    menu.querySelectorAll('.hm-day-section').forEach(el => el.remove());
+
+    // Day section header
+    const dayHeader = document.createElement('div');
+    dayHeader.className = 'hm-day-row hm-day-section';
+    dayHeader.style.cssText = 'padding:4px 10px 6px;font-size:0.6rem;color:var(--muted);font-family:Space Mono,monospace;letter-spacing:1px;text-transform:uppercase;border-top:1px solid var(--border);margin-top:4px;';
+    dayHeader.textContent = 'Day';
+    menu.appendChild(dayHeader);
+
+    hmDayOptions().forEach(iso => {
+      const row = document.createElement('div');
+      row.className = 'hm-type-row hm-day-section' + (iso === heatmapDayKey ? ' active' : '');
+      row.dataset.day = iso;
+      row.style.fontSize = '0.66rem';
+      row.textContent = hmDayLabel(iso);
+      row.onclick = () => selectHeatmapDay(iso);
+      menu.appendChild(row);
+    });
+
+    // ON / OFF row at bottom
+    const sep = document.createElement('div');
+    sep.className = 'hm-day-section';
+    sep.style.cssText = 'border-top:1px solid var(--border);margin-top:4px;padding-top:4px;';
+
+    const toggleRow = document.createElement('div');
+    toggleRow.className = 'hm-type-row hm-day-section';
+    toggleRow.style.cssText = 'color:' + (heatmapActive ? 'var(--pink)' : 'var(--muted)') + ';';
+    toggleRow.textContent = heatmapActive ? '⏹ Turn Off' : '▶ Turn On';
+    toggleRow.onclick = () => { document.getElementById('heatmap-type-selector').classList.remove('open'); toggleHeatmapLayer(); };
+    sep.appendChild(toggleRow);
+    menu.appendChild(sep);
+  }
+
+  function selectHeatmapType(key) {
+    heatmapType = key;
+    // Update active row
+    document.querySelectorAll('.hm-type-row[data-key]').forEach(r => r.classList.toggle('active', r.dataset.key === key));
+    // Update button label
+    const labels = { birch_pollen:'🌳 Birch', grass_pollen:'🌿 Grass', ragweed_pollen:'🌾 Ragweed', alder_pollen:'🍃 Alder', mugwort_pollen:'🌱 Mugwort' };
+    document.getElementById('heatmap-btn-label').textContent = labels[key] || 'Heatmap';
+    if (heatmapActive) loadAndRenderHeatmap();
+  }
+
+  function selectHeatmapDay(iso) {
+    heatmapDayKey = iso;
+    document.querySelectorAll('.hm-type-row[data-day]').forEach(r => r.classList.toggle('active', r.dataset.day === iso));
+    if (heatmapActive) loadAndRenderHeatmap();
+  }
+
+  function toggleHeatmapLayer() {
+    if (heatmapActive) {
+      // Turn off
+      heatmapActive = false;
+      if (heatmapLayer) { map.removeLayer(heatmapLayer); heatmapLayer = null; }
+      document.getElementById('heatmap-btn').classList.remove('active');
+      document.getElementById('heatmap-btn-label').textContent = 'Heatmap';
+      document.getElementById('heatmap-status').style.display = 'none';
+    } else {
+      // Turn on
+      heatmapActive = true;
+      if (!heatmapDayKey) heatmapDayKey = new Date().toISOString().slice(0, 10);
+      document.getElementById('heatmap-btn').classList.add('active');
+      loadAndRenderHeatmap();
+    }
+  }
+
+  // Close heatmap menu when clicking outside
+  document.addEventListener('click', e => {
+    const wrap = document.getElementById('heatmap-wrap');
+    if (wrap && !wrap.contains(e.target)) {
+      document.getElementById('heatmap-type-selector').classList.remove('open');
+    }
+  });
+
+  async function loadAndRenderHeatmap() {
+    if (heatmapLoading) return;
+    const cKey = `${heatmapDayKey}::${heatmapType}`;
+    const statusEl = document.getElementById('heatmap-status');
+    statusEl.style.display = 'block';
+    statusEl.textContent = '🔥 Loading heatmap…';
+
+    // Use client cache if available
+    if (hmCache[cKey]) {
+      renderHeatLayer(hmCache[cKey]);
+      statusEl.style.display = 'none';
+      return;
+    }
+
+    heatmapLoading = true;
+    try {
+      const url = `/api/heatmap?day=${encodeURIComponent(heatmapDayKey)}&type=${encodeURIComponent(heatmapType)}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'API error');
+      hmCache[cKey] = { points: data.points, max: data.max };
+      renderHeatLayer(hmCache[cKey]);
+      statusEl.style.display = 'none';
+    } catch (err) {
+      statusEl.textContent = '⚠ Heatmap load failed: ' + err.message;
+      setTimeout(() => { if (!heatmapLoading) statusEl.style.display = 'none'; }, 4000);
+    } finally {
+      heatmapLoading = false;
+    }
+  }
+
+  function renderHeatLayer({ points, max }) {
+    // Remove existing layer
+    if (heatmapLayer) { map.removeLayer(heatmapLayer); heatmapLayer = null; }
+    if (!points || !points.length) return;
+
+    // Normalise: leaflet.heat expects [lat, lng, intensity 0–1]
+    const peak = max > 0 ? max : 1;
+    const heatData = points.map(([lat, lng, val]) => [lat, lng, val / peak]);
+
+    heatmapLayer = L.heatLayer(heatData, {
+      radius: 28,
+      blur:   22,
+      maxZoom: 10,
+      max: 1.0,
+      gradient: HM_GRADIENT[heatmapType] || HM_GRADIENT.birch_pollen,
+      minOpacity: 0.0,
+    }).addTo(map);
+
+    // Keep heatmap behind the blackout mask layer
+    if (blackoutLayer && blackoutLayer._container) {
+      blackoutLayer._container.style.zIndex = '450';
+    }
+  }
+
+  /* ══ END HEATMAP ══════════════════════════════════════════════════════════ */
 
   window.onload=initMap;
   </script>
