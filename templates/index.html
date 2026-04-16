@@ -38,7 +38,7 @@
     body:not(.light-theme) #map { filter: hue-rotate(300deg) brightness(0.95) saturate(1.4); }
 
     #top-navbar { position: absolute; top: 16px; left: 20px; right: 20px; z-index: 1000; display: flex; align-items: center; gap: 14px; }
-    #logo-container { width: 200px; flex-shrink: 0; pointer-events: none; }
+    #logo-container { width: 260px; flex-shrink: 0; pointer-events: none; }
     #logo-container img { width: 100%; height: auto; display: block; filter: drop-shadow(0 0 12px var(--pink-glow)); }
     #search-wrapper-inner { flex: 1; min-width: 0; max-width: 420px; margin: 0 auto; }
     #top-right-controls { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
@@ -79,10 +79,13 @@
     .search-result-item .result-name { font-weight:600;flex:1; }
     .search-result-item .result-country { font-size:0.7rem;color:var(--muted); }
 
-    #pollen-report { top:86px;left:20px;width:310px;padding:18px 20px 14px; display:none;animation:slideIn 0.25s ease;max-height:calc(100vh - 170px);overflow:hidden;flex-direction:column; }
+    #pollen-report { top:86px;left:20px;width:300px;padding:16px 18px 12px; display:none;animation:slideIn 0.25s ease;max-height:calc(100vh - 230px);overflow:hidden;flex-direction:column; }
+    #pollen-report-header { display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;flex-shrink:0; }
+    #report-close-btn { background:none;border:1px solid var(--border);border-radius:6px;width:24px;height:24px;color:var(--muted);font-size:0.8rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:border-color 0.15s,color 0.15s;line-height:1; }
+    #report-close-btn:hover { border-color:var(--pink);color:var(--pink); }
     @keyframes slideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
 
-    #report-loc { font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--pink);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;flex-shrink:0; }
+    #report-loc { font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--pink);letter-spacing:2px;text-transform:uppercase;flex:1; }
 
     #pollen-type-filter { display:flex;gap:4px;margin-bottom:10px;flex-shrink:0;flex-wrap:wrap; }
     .type-chip { padding:3px 8px;border-radius:20px;font-size:0.58rem;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Space Mono',monospace;transition:all 0.15s ease; }
@@ -104,7 +107,8 @@
     .pollen-item { display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04); }
     .pollen-item:last-child { border-bottom:none; }
     .pollen-label { font-weight:700;font-size:0.75rem;display:flex;align-items:center;gap:6px; }
-    .pollen-val { font-family:'Space Mono',monospace;font-size:0.78rem;color:var(--pink); }
+    .pollen-val { font-family:'Space Mono',monospace;font-size:0.78rem;color:var(--pink);display:flex;align-items:baseline;gap:3px; }
+    .pollen-unit { font-size:0.55rem;color:var(--muted);font-family:'Space Mono',monospace;letter-spacing:0; }
 
     /* Tag + tooltip */
     .tag-wrap { display:inline-flex;align-items:center;gap:3px;position:relative; }
@@ -220,7 +224,10 @@
   </div>
 
   <div id="pollen-report" class="glass-card">
-    <h2 id="report-loc">LOCAL POLLEN DATA</h2>
+    <div id="pollen-report-header">
+      <h2 id="report-loc">LOCAL POLLEN DATA</h2>
+      <button id="report-close-btn" onclick="closePollenReport()" title="Close">✕</button>
+    </div>
     <div id="pollen-type-filter"></div>
     <div id="summary-bar" class="summary-bar" style="display:none"></div>
     <div id="day-tabs"></div>
@@ -559,7 +566,7 @@
               <span class="tag-info" style="color:${col}">?<span class="tag-tooltip">${desc}</span></span>
             </span>
           </span>
-          <span class="pollen-val">${dispVal}</span>
+          <span class="pollen-val">${dispVal}${val!==null?`<span class="pollen-unit">gr/m³</span>`:''}</span>
         </div>`;
       }).join('');
       return `<div class="hour-block"><div class="hour-label">⏱ ${fmtHour(h.time)}</div>${rows}</div>`;
@@ -888,6 +895,11 @@
     document.getElementById('rev-text').value='';
     document.getElementById('review-modal').classList.add('visible');
     window.currentLatlng=latlng;
+  }
+
+  function closePollenReport(){
+    document.getElementById('pollen-report').style.display='none';
+    if (activeMarker){map.removeLayer(activeMarker);activeMarker=null;}
   }
 
   function closeReviewModal(){
