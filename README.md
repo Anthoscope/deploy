@@ -41,6 +41,34 @@ python -c "import psycopg2; conn = psycopg2.connect(dbname='pollen_db', user='po
 ```
 Finally, run the application:
 ```bash
-python app.py
+DATABASE_URL=postgresql://postgres:postgres@localhost/pollen_db python app.py
 ```
 The app should start on `http://localhost:5000`
+
+## Map & data stack (all open)
+
+| Part | What we use | Notes |
+|---|---|---|
+| Basemap | [MapLibre GL JS](https://maplibre.org/) + [OpenFreeMap](https://openfreemap.org/) | No API key, no usage cap. `positron` style in light mode, `dark` style in dark mode. |
+| Pollen forecast | [CAMS European Air Quality Forecast](https://atmosphere.copernicus.eu/) via the [Open-Meteo Air Quality API](https://open-meteo.com/en/docs/air-quality-api) | 0.1° grid, 4-day hourly forecast; alder, birch, grass, mugwort, olive, ragweed. Attribution (CC BY 4.0) is shown on the map. |
+| Place search | [Photon](https://photon.komoot.io/) (OSM) | Built for search-as-you-type; results limited to the coverage area. |
+
+Open-Meteo's free tier is for non-commercial use (< 10 000 calls/day). If Anthoscope ever becomes commercial, either take an Open-Meteo subscription or pull CAMS directly from the Copernicus Atmosphere Data Store (free, commercial use allowed).
+
+## Pollen heatmap
+
+Pollen forecasts only change once a day, so the heatmap is served from a saved **snapshot** instead of live API calls:
+
+1. `scripts/build_pollen_grid.py` samples a 1° grid over Europe (3 053 points) from Open-Meteo, keeps the **daily peak** per pollen type for 4 days, and stores it in the `pollen_snapshots` table (last 14 kept).
+2. `.github/workflows/pollen-snapshot.yml` runs it at 04:23 and 16:23 UTC (~6 min each, ~6 100 API calls/day).
+3. `GET /api/pollen/grid` returns the latest snapshot; it is cached in memory and at Vercel's CDN, so the database is barely touched.
+4. The map draws it client-side (bilinear interpolation, projected to Web Mercator) under the place labels.
+
+**Setup once:** in GitHub → *Settings → Secrets and variables → Actions*, add `DATABASE_URL` (the same Neon connection string Vercel uses). Then open *Actions → Pollen heatmap snapshot → Run workflow* to create the first snapshot.
+
+**Local development without a database:**
+```bash
+python scripts/build_pollen_grid.py --no-db --out static/data/pollen_grid.json
+python app.py   # /api/pollen/grid falls back to that file
+```
+Use `--step 2` for a quicker, coarser grid while testing.
