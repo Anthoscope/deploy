@@ -1,0 +1,8 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.github/
+scripts/
+node_modules/
+static/landing/images/desktop.ini
