@@ -31,3 +31,12 @@ SELECT
     AVG(radius_km) as avg_radius_km
 FROM allergy_reviews
 GROUP BY pollen_type, severity;
+-- Pollen heatmap snapshots (written by scripts/build_pollen_grid.py,
+-- read by GET /api/pollen/grid). The script also creates this if missing.
+CREATE TABLE IF NOT EXISTS pollen_snapshots (
+    id SERIAL PRIMARY KEY,
+    generated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    payload JSONB NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pollen_snapshots_generated
+    ON pollen_snapshots (generated_at DESC);
