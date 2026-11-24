@@ -8,11 +8,26 @@
   <link rel="shortcut icon" href="/static/anthoscope-logo1.ico">
   <link rel="icon" type="image/x-icon" href="/static/anthoscope-logo1.ico">
 
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <!-- Warm up connections we will need right away -->
+  <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
+  <link rel="preconnect" href="https://air-quality-api.open-meteo.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <!-- Open-source map stack: MapLibre GL JS + OpenFreeMap vector tiles (no API key, no trial) -->
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.css">
+  <script defer src="https://unpkg.com/maplibre-gl@5.24.1/dist/maplibre-gl.js"></script>
   <script defer src="/_vercel/insights/script.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    // Apply the saved / system theme before first paint (no flash, right basemap from the start)
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('anthoscope-theme'); } catch (e) {}
+      if (!t) t = (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
 
   <style>
     :root {
@@ -35,12 +50,11 @@
     body { font-family: 'Syne', sans-serif; height: 100vh; background: var(--bg); color: var(--text); overflow: hidden; transition: background 0.3s ease; }
 
     #map { position: absolute; inset: 0; z-index: 1; }
-    body:not(.light-theme) #map { filter: hue-rotate(300deg) brightness(0.95) saturate(1.4); }
 
     #top-navbar { position: absolute; top: 16px; left: 20px; right: 20px; z-index: 1000; display: flex; align-items: center; gap: 14px; }
     #logo-container { width: 260px; flex-shrink: 0; pointer-events: none; }
     #logo-container img { width: 100%; height: auto; display: block; filter: drop-shadow(0 0 12px var(--pink-glow)); }
-    #search-wrapper-inner { flex: 1; min-width: 0; max-width: 420px; margin: 0 auto; }
+    #search-wrapper-inner { flex: 1; min-width: 0; max-width: 420px; margin: 0 auto; position: relative; }
     #top-right-controls { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 
     .theme-switch { position: relative; display: inline-block; width: 64px; height: 32px; flex-shrink: 0; }
@@ -61,13 +75,12 @@
     .lang-flag { font-size:1rem; }
 
     .glass-card { background:var(--surface);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px); border-radius:16px;border:1px solid var(--border); box-shadow:0 0 0 1px rgba(255,77,122,0.08) inset,0 16px 40px rgba(0,0,0,0.55); z-index:1000;position:absolute;transition:background 0.3s,border 0.3s; }
+    body.light-theme .glass-card { box-shadow:0 0 0 1px rgba(255,77,122,0.08) inset,0 12px 30px rgba(0,0,0,0.14); }
 
-    #search-wrapper { position:absolute;top:80px;left:50%;transform:translateX(-50%); z-index:1000;width:min(420px,calc(100vw - 48px)); display:none; }
-    #search-wrapper-inner { position: relative; }
     #search-container { display:flex;align-items:center; background:var(--surface);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px); border:1px solid var(--border);border-radius:14px;padding:0 14px; box-shadow:0 8px 32px rgba(0,0,0,0.5),0 0 0 1px rgba(255,77,122,0.08) inset; transition:border-color 0.2s,box-shadow 0.2s;gap:10px; }
     #search-container:focus-within { border-color:rgba(255,77,122,0.5); box-shadow:0 8px 32px rgba(0,0,0,0.5),0 0 0 2px rgba(255,77,122,0.2); }
     #search-icon { color:var(--muted);font-size:1rem;flex-shrink:0; }
-    #search-input { flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:'Syne',sans-serif;font-size:0.88rem;padding:12px 0;font-weight:600; }
+    #search-input { flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:'Syne',sans-serif;font-size:0.88rem;padding:12px 0;font-weight:600;min-width:0; }
     #search-input::placeholder { color:var(--muted);font-weight:400; }
     #search-btn { background:var(--pink);color:white;border:none;border-radius:8px;padding:6px 14px;font-family:'Syne',sans-serif;font-weight:700;font-size:0.78rem;letter-spacing:0.5px;flex-shrink:0;transition:opacity 0.15s; }
     #search-btn:hover { opacity:0.85; }
@@ -117,6 +130,10 @@
     .tag-low  { background:rgba(76,175,80,0.2);color:#81c784; }
     .tag-mod  { background:rgba(255,193,7,0.2);color:#ffd54f; }
     .tag-high { background:rgba(239,83,80,0.25);color:#ef9a9a; }
+    body.light-theme .tag-none { color:rgba(60,60,60,0.6); }
+    body.light-theme .tag-low  { color:#2e7d32; }
+    body.light-theme .tag-mod  { color:#a06c00; }
+    body.light-theme .tag-high { color:#c62828; }
 
     .tag-info { display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:50%;font-size:0.5rem;font-weight:700;border:1px solid currentColor;opacity:0.6;line-height:1;flex-shrink:0;position:relative;transition:opacity 0.15s;font-family:'Space Mono',monospace; }
     .tag-info:hover { opacity:1; }
@@ -137,7 +154,31 @@
     #drawAreaBtn:hover { transform:translateY(-1px);box-shadow:0 8px 28px var(--pink-glow); }
     #drawAreaBtn.active-draw { background:#222d33;box-shadow:0 0 0 2px var(--pink);color:var(--pink); }
 
-    .hint { position:absolute;bottom:30px;left:50%;transform:translateX(-50%);background:rgba(15,25,35,0.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:10px 24px;border-radius:30px;border:1px solid var(--border);font-size:0.8rem;font-weight:600;color:var(--pink);z-index:1000;pointer-events:none;letter-spacing:0.5px;box-shadow:0 8px 32px rgba(0,0,0,0.4); }
+    .hint { position:absolute;bottom:30px;left:50%;transform:translateX(-50%);background:rgba(15,25,35,0.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:10px 24px;border-radius:30px;border:1px solid var(--border);font-size:0.8rem;font-weight:600;color:var(--pink);z-index:1000;pointer-events:none;letter-spacing:0.5px;box-shadow:0 8px 32px rgba(0,0,0,0.4);transition:opacity 0.4s; }
+    body.light-theme .hint { background:rgba(255,255,255,0.85); }
+    .hint.gone { opacity:0; }
+
+    /* ── Heatmap panel ── */
+    #heat-panel { right:20px;bottom:36px;width:280px;padding:12px 14px; }
+    #heat-head { display:flex;align-items:center;justify-content:space-between;gap:10px; }
+    #heat-head .heat-title { font-weight:800;font-size:0.8rem;letter-spacing:0.3px;display:flex;align-items:center;gap:6px; }
+    #heat-collapse { background:none;border:1px solid var(--border);border-radius:6px;width:22px;height:22px;color:var(--muted);font-size:0.7rem;display:flex;align-items:center;justify-content:center;transition:transform 0.2s; }
+    #heat-panel.collapsed #heat-collapse { transform:rotate(180deg); }
+    #heat-panel.collapsed #heat-body { display:none; }
+    .mini-switch { position:relative;display:inline-block;width:36px;height:20px;flex-shrink:0;margin-left:auto; }
+    .mini-switch input { opacity:0;width:0;height:0; }
+    .mini-switch span { position:absolute;inset:0;background:var(--toggle-bg);border:1px solid var(--border);border-radius:20px;transition:.25s; }
+    .mini-switch span:before { content:"";position:absolute;width:14px;height:14px;left:2px;top:2px;border-radius:50%;background:#f3f3f3;transition:.25s; }
+    .mini-switch input:checked + span { background:var(--pink);border-color:var(--pink); }
+    .mini-switch input:checked + span:before { transform:translateX(16px); }
+    #heat-body { margin-top:10px; }
+    .heat-chips { display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px; }
+    #heat-legend { margin-top:4px; }
+    #heat-legend-bar { height:8px;border-radius:4px;border:1px solid var(--border); }
+    #heat-legend-ticks { display:flex;justify-content:space-between;font-family:'Space Mono',monospace;font-size:0.55rem;color:var(--muted);margin-top:3px; }
+    #heat-legend-labels { display:flex;justify-content:space-between;font-size:0.55rem;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;margin-top:1px;color:var(--muted); }
+    .heat-meta { font-family:'Space Mono',monospace;font-size:0.56rem;color:var(--muted);margin-top:8px;line-height:1.5; }
+    .heat-note { font-family:'Space Mono',monospace;font-size:0.6rem;color:var(--pink);margin-top:6px;line-height:1.5; }
 
     #oob-toast { display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:3000;background:var(--surface);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--pink);border-radius:16px;padding:24px 32px;text-align:center;box-shadow:0 0 60px rgba(255,77,122,0.3),0 16px 40px rgba(0,0,0,0.6);max-width:340px; }
     #oob-toast.visible { display:block;animation:toastIn 0.25s ease; }
@@ -181,14 +222,35 @@
     .btn-cancel,.btn-submit { flex:1;padding:12px;border-radius:10px;font-family:'Syne',sans-serif;font-weight:600;font-size:0.85rem; }
     .btn-cancel { background:rgba(0,0,0,0.05);color:var(--text);border:1px solid var(--border); }
     .btn-submit { background:var(--pink);color:white;border:none;box-shadow:0 4px 14px var(--pink-glow); }
-    .leaflet-popup-content-wrapper { background:var(--surface) !important;color:var(--text) !important;font-family:'Syne',sans-serif !important;border-radius:10px !important;border:1px solid var(--pink) !important; }
+
+    /* MapLibre popups & attribution, themed */
+    .maplibregl-popup-content { background:var(--surface) !important;color:var(--text) !important;font-family:'Syne',sans-serif !important;border-radius:10px !important;border:1px solid var(--pink) !important;padding:10px 14px !important;max-width:260px;font-size:0.8rem;line-height:1.45; }
+    .maplibregl-popup-content b { color:var(--pink); }
+    .maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color:var(--pink) !important; }
+    .maplibregl-popup-anchor-top .maplibregl-popup-tip { border-bottom-color:var(--pink) !important; }
+    .maplibregl-popup-close-button { color:var(--muted); }
+    body:not(.light-theme) .maplibregl-ctrl-attrib { background:rgba(10,20,28,0.75) !important;color:var(--muted); }
+    body:not(.light-theme) .maplibregl-ctrl-attrib a { color:rgba(232,237,240,0.7); }
+    body:not(.light-theme) .maplibregl-ctrl-attrib-button { filter:invert(1); }
+
+    @media (max-width: 720px) {
+      #top-navbar { top:10px;left:12px;right:12px;flex-wrap:wrap;gap:10px; }
+      #logo-container { width: 120px; }
+      #top-right-controls { margin-left:auto; }
+      #search-wrapper-inner { order:3;flex-basis:100%;max-width:none; }
+      #pollen-report { left:12px;right:12px;width:auto;top:148px;transform:none;max-height:calc(100vh - 292px);animation:none; }
+      #heat-panel { left:12px;right:12px;width:auto;bottom:82px; }
+      #drawAreaBtn { left:12px;right:12px;width:auto;bottom:16px; }
+      .hint { display:none; }
+    }
   </style>
 </head>
 <body>
+  <script>document.body.classList.toggle('light-theme', document.documentElement.dataset.theme === 'light');</script>
 
   <div id="top-navbar">
     <div id="logo-container">
-      <img src="{{ url_for('static', filename='images/anthologo_neg.png') }}" alt="Anthoscope">
+      <img src="{{ url_for('static', filename='images/anthologo_neg.png') }}" alt="Anthoscope" decoding="async">
     </div>
 
     <div id="search-wrapper-inner">
@@ -210,10 +272,10 @@
           <span id="lang-label">EN</span>
         </button>
         <div id="lang-dropdown">
-          <div class="lang-option active" onclick="setLanguage('en')"><span class="lang-flag">🇬🇧</span> English</div>
-          <div class="lang-option" onclick="setLanguage('el')"><span class="lang-flag">🇬🇷</span> Ελληνικά</div>
-          <div class="lang-option" onclick="setLanguage('de')"><span class="lang-flag">🇩🇪</span> Deutsch</div>
-          <div class="lang-option" onclick="setLanguage('es')"><span class="lang-flag">🇪🇸</span> Español</div>
+          <div class="lang-option active" data-lang="en" onclick="setLanguage('en')"><span class="lang-flag">🇬🇧</span> English</div>
+          <div class="lang-option" data-lang="el" onclick="setLanguage('el')"><span class="lang-flag">🇬🇷</span> Ελληνικά</div>
+          <div class="lang-option" data-lang="de" onclick="setLanguage('de')"><span class="lang-flag">🇩🇪</span> Deutsch</div>
+          <div class="lang-option" data-lang="es" onclick="setLanguage('es')"><span class="lang-flag">🇪🇸</span> Español</div>
         </div>
       </div>
       <label class="theme-switch">
@@ -235,6 +297,26 @@
     <button id="plot-btn" onclick="openChartModal()">
       📈 <span data-i18n="plot_btn">Plot Pollen Data</span>
     </button>
+  </div>
+
+  <!-- Heatmap controls -->
+  <div id="heat-panel" class="glass-card">
+    <div id="heat-head">
+      <span class="heat-title">🌸 <span data-i18n="heat_title">Pollen heatmap</span></span>
+      <label class="mini-switch" title="On / off"><input type="checkbox" id="heat-toggle" checked><span></span></label>
+      <button id="heat-collapse" onclick="toggleHeatPanel()" title="Collapse">▾</button>
+    </div>
+    <div id="heat-body">
+      <div id="heat-types" class="heat-chips"></div>
+      <div id="heat-days" class="heat-chips"></div>
+      <div id="heat-legend">
+        <div id="heat-legend-bar"></div>
+        <div id="heat-legend-ticks"><span>1</span><span>30</span><span>80</span><span>200</span><span>500+</span></div>
+        <div id="heat-legend-labels"><span data-i18n="cat_low">Low</span><span data-i18n="cat_mod">Mod</span><span data-i18n="cat_high">High</span><span data-i18n="cat_vhigh">Very high</span></div>
+      </div>
+      <div id="heat-note" class="heat-note" style="display:none"></div>
+      <div id="heat-meta" class="heat-meta"></div>
+    </div>
   </div>
 
   <div class="hint" id="hint-text">📍 Tap anywhere on the map to inspect local pollen levels</div>
@@ -296,17 +378,20 @@
       hint:'📍 Tap anywhere on the map to inspect local pollen levels',
       draw_btn:'Draw Area & Review', draw_btn_active:'Tap map to place area',
       oob_title:'Outside Coverage Area', oob_msg:'Anthoscope does not support this location yet.', oob_close:'Got it',
-      review_title:'Submit Allergy Review', review_placeholder:'Describe the pollen impact in this area…',
+      review_title:'Submit Allergy Review', review_placeholder:'Describe the pollen impact in this area…', review_label:'Review',
       cancel:'Cancel', submit:'Submit',
       fetching:'⌛ Fetching forecast…', no_data_day:'No data for this day.',
       no_data:'⚠ No pollen data available.', fetch_error:'⚠ Could not fetch data.',
       today:'Today', tomorrow:'Tomorrow', all_types:'All',
-      pollen_types_labels:{birch:'Birch',grass:'Grass',ragweed:'Ragweed',alder:'Alder',mugwort:'Mugwort'},
-      cat_high:'High', cat_mod:'Mod', cat_low:'Low', cat_na:'N/A', cat_none:'–',
+      pollen_types_labels:{birch:'Birch',grass:'Grass',ragweed:'Ragweed',alder:'Alder',mugwort:'Mugwort',olive:'Olive'},
+      cat_high:'High', cat_mod:'Mod', cat_low:'Low', cat_vhigh:'Very high', cat_na:'N/A', cat_none:'–',
       no_results:'No results found', searching:'Searching…',
       plot_btn:'Plot Pollen Data', chart_title:'Pollen Forecast Chart',
       chart_select_types:'Select Pollen Types', chart_select_days:'Select Days',
       chart_render_btn:'Generate Chart', chart_placeholder:'Select pollen types and days above, then click Generate Chart.',
+      heat_title:'Pollen heatmap', heat_meta:'Daily peak, grains/m³ · CAMS model · updated {ago}',
+      heat_loading:'Loading heatmap…', heat_unavailable:'Heatmap data is not available yet.',
+      heat_quiet:'No significant pollen in the forecast for this selection (likely off-season).',
       severity_desc:{
         high:'HIGH (>80 grains/m³): Very likely to trigger severe allergy symptoms. Sensitive individuals should stay indoors and consider taking medication.',
         mod:'MODERATE (31–80 grains/m³): May cause symptoms in people with moderate sensitivities. Consider antihistamines before going outside.',
@@ -319,17 +404,20 @@
       hint:'📍 Πατήστε οπουδήποτε στον χάρτη για επίπεδα γύρης',
       draw_btn:'Σχεδίαση Περιοχής & Αξιολόγηση', draw_btn_active:'Πατήστε στον χάρτη για τοποθέτηση',
       oob_title:'Εκτός Περιοχής Κάλυψης', oob_msg:'Το Anthoscope δεν υποστηρίζει αυτήν την τοποθεσία ακόμα.', oob_close:'Εντάξει',
-      review_title:'Υποβολή Αξιολόγησης Αλλεργίας', review_placeholder:'Περιγράψτε την επίδραση της γύρης σε αυτήν την περιοχή…',
+      review_title:'Υποβολή Αξιολόγησης Αλλεργίας', review_placeholder:'Περιγράψτε την επίδραση της γύρης σε αυτήν την περιοχή…', review_label:'Αξιολόγηση',
       cancel:'Ακύρωση', submit:'Υποβολή',
       fetching:'⌛ Λήψη πρόγνωσης…', no_data_day:'Δεν υπάρχουν δεδομένα για αυτήν την ημέρα.',
       no_data:'⚠ Δεν υπάρχουν δεδομένα γύρης.', fetch_error:'⚠ Αδύνατη η λήψη δεδομένων.',
       today:'Σήμερα', tomorrow:'Αύριο', all_types:'Όλα',
-      pollen_types_labels:{birch:'Σημύδα',grass:'Χόρτο',ragweed:'Αγριόχορτο',alder:'Σκλήθρα',mugwort:'Αρτεμισία'},
-      cat_high:'Υψηλό', cat_mod:'Μέτριο', cat_low:'Χαμηλό', cat_na:'Ν/Α', cat_none:'–',
+      pollen_types_labels:{birch:'Σημύδα',grass:'Χόρτο',ragweed:'Αμβροσία',alder:'Σκλήθρα',mugwort:'Αρτεμισία',olive:'Ελιά'},
+      cat_high:'Υψηλό', cat_mod:'Μέτριο', cat_low:'Χαμηλό', cat_vhigh:'Πολύ υψηλό', cat_na:'Ν/Α', cat_none:'–',
       no_results:'Δεν βρέθηκαν αποτελέσματα', searching:'Αναζήτηση…',
       plot_btn:'Γράφημα Γύρης', chart_title:'Γράφημα Πρόγνωσης Γύρης',
       chart_select_types:'Επιλογή Τύπων Γύρης', chart_select_days:'Επιλογή Ημερών',
       chart_render_btn:'Δημιουργία Γραφήματος', chart_placeholder:'Επιλέξτε τύπους γύρης και ημέρες και κάντε κλικ στη Δημιουργία.',
+      heat_title:'Χάρτης θερμότητας γύρης', heat_meta:'Ημερήσια μέγιστη τιμή, κόκκοι/m³ · μοντέλο CAMS · ενημέρωση {ago}',
+      heat_loading:'Φόρτωση χάρτη…', heat_unavailable:'Τα δεδομένα του χάρτη δεν είναι ακόμη διαθέσιμα.',
+      heat_quiet:'Δεν προβλέπεται σημαντική γύρη για αυτή την επιλογή (πιθανώς εκτός εποχής).',
       severity_desc:{
         high:'ΥΨΗΛΟ (>80 κόκκοι/m³): Πιθανό να προκαλέσει σοβαρά συμπτώματα αλλεργίας. Οι ευαίσθητοι να παραμείνουν σε εσωτερικούς χώρους.',
         mod:'ΜΕΤΡΙΟ (31–80 κόκκοι/m³): Μπορεί να προκαλέσει συμπτώματα σε άτομα με μέτρια ευαισθησία. Συνιστώνται αντιισταμινικά.',
@@ -342,17 +430,20 @@
       hint:'📍 Auf die Karte tippen, um lokale Pollenwerte zu prüfen',
       draw_btn:'Bereich zeichnen & Bewerten', draw_btn_active:'Karte tippen zum Platzieren',
       oob_title:'Außerhalb des Abdeckungsbereichs', oob_msg:'Anthoscope unterstützt diesen Standort noch nicht.', oob_close:'Verstanden',
-      review_title:'Allergie-Bewertung einreichen', review_placeholder:'Beschreiben Sie die Pollenbelastung in diesem Bereich…',
+      review_title:'Allergie-Bewertung einreichen', review_placeholder:'Beschreiben Sie die Pollenbelastung in diesem Bereich…', review_label:'Bewertung',
       cancel:'Abbrechen', submit:'Einreichen',
       fetching:'⌛ Prognose wird geladen…', no_data_day:'Keine Daten für diesen Tag.',
       no_data:'⚠ Keine Pollendaten verfügbar.', fetch_error:'⚠ Daten konnten nicht abgerufen werden.',
       today:'Heute', tomorrow:'Morgen', all_types:'Alle',
-      pollen_types_labels:{birch:'Birke',grass:'Gras',ragweed:'Beifuß-Ambrosie',alder:'Erle',mugwort:'Beifuß'},
-      cat_high:'Hoch', cat_mod:'Mittel', cat_low:'Niedrig', cat_na:'N/V', cat_none:'–',
+      pollen_types_labels:{birch:'Birke',grass:'Gras',ragweed:'Beifuß-Ambrosie',alder:'Erle',mugwort:'Beifuß',olive:'Olive'},
+      cat_high:'Hoch', cat_mod:'Mittel', cat_low:'Niedrig', cat_vhigh:'Sehr hoch', cat_na:'N/V', cat_none:'–',
       no_results:'Keine Ergebnisse gefunden', searching:'Suche läuft…',
       plot_btn:'Pollen-Diagramm', chart_title:'Pollen-Prognose-Diagramm',
       chart_select_types:'Pollenarten auswählen', chart_select_days:'Tage auswählen',
       chart_render_btn:'Diagramm erstellen', chart_placeholder:'Pollenarten und Tage auswählen, dann auf Erstellen klicken.',
+      heat_title:'Pollen-Heatmap', heat_meta:'Tagesspitze, Körner/m³ · CAMS-Modell · aktualisiert {ago}',
+      heat_loading:'Heatmap wird geladen…', heat_unavailable:'Heatmap-Daten sind noch nicht verfügbar.',
+      heat_quiet:'Für diese Auswahl ist kein nennenswerter Pollenflug vorhergesagt (vermutlich außerhalb der Saison).',
       severity_desc:{
         high:'HOCH (>80 Körner/m³): Kann starke Allergiesymptome auslösen. Empfindlichen Personen wird empfohlen, drinnen zu bleiben.',
         mod:'MITTEL (31–80 Körner/m³): Kann bei mittlerer Empfindlichkeit Symptome verursachen. Antihistaminika in Betracht ziehen.',
@@ -365,17 +456,20 @@
       hint:'📍 Toca el mapa para inspeccionar los niveles de polen locales',
       draw_btn:'Dibujar Área y Reseñar', draw_btn_active:'Toca el mapa para colocar el área',
       oob_title:'Fuera del Área de Cobertura', oob_msg:'Anthoscope aún no admite esta ubicación.', oob_close:'Entendido',
-      review_title:'Enviar Reseña de Alergia', review_placeholder:'Describe el impacto del polen en esta área…',
+      review_title:'Enviar Reseña de Alergia', review_placeholder:'Describe el impacto del polen en esta área…', review_label:'Reseña',
       cancel:'Cancelar', submit:'Enviar',
       fetching:'⌛ Obteniendo pronóstico…', no_data_day:'No hay datos para este día.',
       no_data:'⚠ No hay datos de polen disponibles.', fetch_error:'⚠ No se pudieron obtener datos.',
       today:'Hoy', tomorrow:'Mañana', all_types:'Todo',
-      pollen_types_labels:{birch:'Abedul',grass:'Hierba',ragweed:'Ambrosía',alder:'Aliso',mugwort:'Artemisa'},
-      cat_high:'Alto', cat_mod:'Mod.', cat_low:'Bajo', cat_na:'N/D', cat_none:'–',
+      pollen_types_labels:{birch:'Abedul',grass:'Hierba',ragweed:'Ambrosía',alder:'Aliso',mugwort:'Artemisa',olive:'Olivo'},
+      cat_high:'Alto', cat_mod:'Mod.', cat_low:'Bajo', cat_vhigh:'Muy alto', cat_na:'N/D', cat_none:'–',
       no_results:'No se encontraron resultados', searching:'Buscando…',
       plot_btn:'Graficar Polen', chart_title:'Gráfico de Pronóstico de Polen',
       chart_select_types:'Seleccionar Tipos de Polen', chart_select_days:'Seleccionar Días',
       chart_render_btn:'Generar Gráfico', chart_placeholder:'Selecciona tipos y días, luego haz clic en Generar Gráfico.',
+      heat_title:'Mapa de calor de polen', heat_meta:'Pico diario, granos/m³ · modelo CAMS · actualizado {ago}',
+      heat_loading:'Cargando mapa…', heat_unavailable:'Los datos del mapa de calor aún no están disponibles.',
+      heat_quiet:'No se prevé polen significativo para esta selección (probablemente fuera de temporada).',
       severity_desc:{
         high:'ALTO (>80 granos/m³): Muy probable que provoque síntomas graves. Se recomienda quedarse en interiores y tomar medicación.',
         mod:'MODERADO (31–80 granos/m³): Puede causar síntomas en personas con sensibilidad moderada. Considera antihistamínicos.',
@@ -384,24 +478,29 @@
       }
     }
   };
+  const LOCALES = {en:'en',el:'el-GR',de:'de-DE',es:'es-ES'};
 
   let currentLang = 'en';
+  try { const saved = localStorage.getItem('anthoscope-lang'); if (saved && TRANSLATIONS[saved]) currentLang = saved; } catch (e) {}
   function t(key) { return TRANSLATIONS[currentLang]?.[key] ?? TRANSLATIONS['en'][key] ?? key; }
+  function typeLabel(labelKey) { return TRANSLATIONS[currentLang]?.pollen_types_labels?.[labelKey] || TRANSLATIONS.en.pollen_types_labels[labelKey] || labelKey; }
+  function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
   function applyTranslations() {
+    document.documentElement.lang = currentLang;
     document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
     document.getElementById('hint-text').textContent = t('hint');
-    const db = document.getElementById('drawAreaBtn');
-    if (!db.classList.contains('active-draw')) db.textContent = t('draw_btn');
+    updateDrawBtn();
     renderPollenTypeFilter();
+    renderHeatControls();
   }
 
   function setLanguage(lang) {
     currentLang = lang;
+    try { localStorage.setItem('anthoscope-lang', lang); } catch (e) {}
     document.getElementById('lang-label').textContent = lang.toUpperCase();
-    document.querySelectorAll('.lang-option').forEach(el => el.classList.remove('active'));
-    document.querySelector(`.lang-option[onclick="setLanguage('${lang}')"]`).classList.add('active');
+    document.querySelectorAll('.lang-option').forEach(el => el.classList.toggle('active', el.dataset.lang === lang));
     closeLangDropdown();
     applyTranslations();
     if (activeDayKey) { renderDayTabs(); renderSummaryBar(activeDayKey); renderHourList(activeDayKey); }
@@ -409,9 +508,12 @@
 
   function toggleLangDropdown() { document.getElementById('lang-dropdown').classList.toggle('open'); }
   function closeLangDropdown()  { document.getElementById('lang-dropdown').classList.remove('open'); }
-  document.addEventListener('click', e => { if (!document.getElementById('lang-wrapper').contains(e.target)) closeLangDropdown(); });
+  document.addEventListener('click', e => {
+    if (!document.getElementById('lang-wrapper').contains(e.target)) closeLangDropdown();
+    if (!document.getElementById('search-wrapper-inner').contains(e.target)) document.getElementById('search-results').style.display = 'none';
+  });
 
-  /* ══ EUROPE BOUNDS ══ */
+  /* ══ EUROPE BOUNDS (= CAMS Europe model domain) ══ */
   const EUROPE_BOUNDS = { west:-25.0, east:45.0, south:30.0, north:72.0 };
   function isInEurope(lat,lng) {
     return lat>=EUROPE_BOUNDS.south && lat<=EUROPE_BOUNDS.north && lng>=EUROPE_BOUNDS.west && lng<=EUROPE_BOUNDS.east;
@@ -420,21 +522,28 @@
   function closeOobToast() { document.getElementById('oob-toast').classList.remove('visible'); }
 
   /* ══ MAP STATE ══ */
-  let map, activeMarker, drawingCircle, tileLayer, blackoutLayer;
-  let isDrawingMode = false, reviewMarkers = [];
+  // OpenFreeMap: free, open-source vector tiles from OpenStreetMap data. No key, no usage cap.
+  const STYLE_LIGHT = 'https://tiles.openfreemap.org/styles/positron';
+  const STYLE_DARK  = 'https://tiles.openfreemap.org/styles/dark';
+  const POLLEN_ATTRIBUTION = 'Pollen: <a href="https://atmosphere.copernicus.eu/" target="_blank" rel="noopener">Copernicus CAMS</a> via <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0)';
 
-  const LIGHT_TILES = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-  const DARK_TILES  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+  let map, activeMarker = null, isDrawingMode = false, styleReady = false;
+  let reviewPinImage = null;
+  let reviewsGeo = { type:'FeatureCollection', features:[] };
+  let drawGeo    = { type:'FeatureCollection', features:[] };
 
   const POLLEN_TYPES = [
     { key:'birch_pollen',   labelKey:'birch',   emoji:'🌳', color:'#ff4d7a' },
     { key:'grass_pollen',   labelKey:'grass',   emoji:'🌿', color:'#4db8ff' },
+    { key:'olive_pollen',   labelKey:'olive',   emoji:'🫒', color:'#2dd4bf' },
     { key:'ragweed_pollen', labelKey:'ragweed', emoji:'🌾', color:'#ffd54f' },
     { key:'alder_pollen',   labelKey:'alder',   emoji:'🍃', color:'#a8e063' },
     { key:'mugwort_pollen', labelKey:'mugwort', emoji:'🌱', color:'#c084fc' },
   ];
 
   let pollenByDay = {}, activeDayKey = null, activePollenType = 'all';
+
+  function isLight() { return document.body.classList.contains('light-theme'); }
 
   /* ══ SEVERITY TOOLTIP ══ */
   function severityDesc(cls) {
@@ -451,27 +560,29 @@
     return 'rgba(200,200,200,0.5)';
   }
 
-  /* ══ POLLEN TYPE FILTER ══ */
-  function renderPollenTypeFilter() {
-    const wrap = document.getElementById('pollen-type-filter');
-    wrap.innerHTML = '';
-    const allChip = document.createElement('button');
-    allChip.className = 'type-chip'+(activePollenType==='all'?' active':'');
-    allChip.textContent = t('all_types');
-    allChip.onclick = () => selectPollenType('all');
-    wrap.appendChild(allChip);
+  /* ══ POLLEN TYPE FILTER (shared by the panel and the heatmap) ══ */
+  function makeTypeChips(container, chipClass) {
+    container.innerHTML = '';
+    const all = document.createElement('button');
+    all.className = chipClass + (activePollenType==='all' ? ' active' : '');
+    all.textContent = t('all_types');
+    all.onclick = () => selectPollenType('all');
+    container.appendChild(all);
     POLLEN_TYPES.forEach(pt => {
       const chip = document.createElement('button');
-      chip.className = 'type-chip'+(activePollenType===pt.key?' active':'');
-      chip.textContent = pt.emoji+' '+(TRANSLATIONS[currentLang]?.pollen_types_labels?.[pt.labelKey]||pt.labelKey);
+      chip.className = chipClass + (activePollenType===pt.key ? ' active' : '');
+      chip.textContent = pt.emoji + ' ' + typeLabel(pt.labelKey);
       chip.onclick = () => selectPollenType(pt.key);
-      wrap.appendChild(chip);
+      container.appendChild(chip);
     });
   }
+  function renderPollenTypeFilter() { makeTypeChips(document.getElementById('pollen-type-filter'), 'type-chip'); }
 
   function selectPollenType(typeKey) {
     activePollenType = typeKey;
     renderPollenTypeFilter();
+    renderHeatControls();
+    renderHeat();
     if (activeDayKey) { renderSummaryBar(activeDayKey); renderHourList(activeDayKey); }
   }
 
@@ -485,30 +596,30 @@
   }
 
   function fmtHour(s) { return s.slice(11,16); }
+  function pad2(n) { return String(n).padStart(2,'0'); }
+  function localDateKey(offsetDays=0) {
+    const d = new Date(Date.now() + offsetDays*86400000);
+    return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+  }
 
   function fmtDateLabel(dayKey) {
+    if (dayKey===localDateKey(0)) return t('today');
+    if (dayKey===localDateKey(1)) return t('tomorrow');
     const d = new Date(dayKey+'T12:00:00Z');
-    const today    = new Date().toISOString().slice(0,10);
-    const tomorrow = new Date(Date.now()+86400000).toISOString().slice(0,10);
-    if (dayKey===today)    return t('today');
-    if (dayKey===tomorrow) return t('tomorrow');
-    const lm = {en:'en',el:'el-GR',de:'de-DE',es:'es-ES'};
-    return d.toLocaleDateString(lm[currentLang]||'en',{weekday:'short',month:'short',day:'numeric',timeZone:'UTC'});
+    return d.toLocaleDateString(LOCALES[currentLang]||'en',{weekday:'short',month:'short',day:'numeric',timeZone:'UTC'});
   }
 
   function buildDayData(apiData) {
     const times=apiData.hourly.time, result={};
-    times.forEach((t,i)=>{
-      const dayKey=t.slice(0,10);
+    times.forEach((time,i)=>{
+      const dayKey=time.slice(0,10);
       if (!result[dayKey]) result[dayKey]=[];
-      const entry={time:t};
-      let any=false;
+      const entry={time};
       POLLEN_TYPES.forEach(pt=>{
         const v=apiData.hourly[pt.key]?.[i];
         entry[pt.key]=(v!==null&&v!==undefined)?v:null;
-        if (v!==null&&v!==undefined) any=true;
       });
-      if (any||result[dayKey].length>0) result[dayKey].push(entry);
+      result[dayKey].push(entry);
     });
     Object.keys(result).forEach(day=>{
       if (!result[day].some(h=>POLLEN_TYPES.some(pt=>h[pt.key]!==null))) delete result[day];
@@ -533,15 +644,23 @@
     return activePollenType==='all' ? POLLEN_TYPES : POLLEN_TYPES.filter(p=>p.key===activePollenType);
   }
 
+  function dayPeak(hours, key) {
+    let peak = null;
+    for (const h of hours) { const v = h[key]; if (v !== null && (peak === null || v > peak)) peak = v; }
+    return peak;
+  }
+
   function renderSummaryBar(dayKey) {
-    const bar=document.getElementById('summary-bar'), hours=pollenByDay[dayKey]||[], types=getActivePollens().slice(0,4);
+    const bar=document.getElementById('summary-bar'), hours=pollenByDay[dayKey]||[];
+    // show the four types with the highest peak that day
+    const types=getActivePollens()
+      .map(pt=>({pt, peak:dayPeak(hours, pt.key)}))
+      .sort((a,b)=>(b.peak??-1)-(a.peak??-1))
+      .slice(0,4);
     bar.style.display='flex';
-    bar.innerHTML=types.map(pt=>{
-      const vals=hours.map(h=>h[pt.key]).filter(v=>v!==null);
-      const peak=vals.length?Math.max(...vals):null;
+    bar.innerHTML=types.map(({pt,peak})=>{
       const {cls}=getCategory(peak);
-      const label=TRANSLATIONS[currentLang]?.pollen_types_labels?.[pt.labelKey]||pt.labelKey;
-      return `<div class="sum-chip ${cls}"><span class="chip-name">${label}</span><span class="chip-val">${peak!==null?Math.round(peak):'–'}</span></div>`;
+      return `<div class="sum-chip ${cls}"><span class="chip-name">${typeLabel(pt.labelKey)}</span><span class="chip-val">${peak!==null?Math.round(peak):'–'}</span></div>`;
     }).join('');
   }
 
@@ -556,14 +675,11 @@
         const val=h[pt.key];
         const {label,cls}=getCategory(val);
         const dispVal=val!==null?Math.round(val):'–';
-        const ptLabel=TRANSLATIONS[currentLang]?.pollen_types_labels?.[pt.labelKey]||pt.labelKey;
-        const desc=severityDesc(cls);
-        const col=severityColor(cls);
         return `<div class="pollen-item">
-          <span class="pollen-label">${pt.emoji} ${ptLabel}
+          <span class="pollen-label">${pt.emoji} ${typeLabel(pt.labelKey)}
             <span class="tag-wrap">
               <span class="tag ${cls}">${label}</span>
-              <span class="tag-info" style="color:${col}">?<span class="tag-tooltip">${desc}</span></span>
+              <span class="tag-info" style="color:${severityColor(cls)}">?<span class="tag-tooltip">${severityDesc(cls)}</span></span>
             </span>
           </span>
           <span class="pollen-val">${dispVal}${val!==null?`<span class="pollen-unit">gr/m³</span>`:''}</span>
@@ -579,108 +695,182 @@
   }
 
   /* ══ MARKER ══ */
-  function pinSVG() {
-    return `<svg width="30" height="42" viewBox="0 0 30 42" xmlns="http://www.w3.org/2000/svg"><path d="M15 0C6.7 0 0 6.7 0 15C0 26.2 15 42 15 42C15 42 30 26.2 30 15C30 6.7 23.3 0 15 0Z" fill="#ff4d7a"/><circle cx="15" cy="15" r="6" fill="white" fill-opacity="0.9"/></svg>`;
+  function pinElement() {
+    const el = document.createElement('div');
+    el.innerHTML = `<svg width="30" height="42" viewBox="0 0 30 42" xmlns="http://www.w3.org/2000/svg"><path d="M15 0C6.7 0 0 6.7 0 15C0 26.2 15 42 15 42C15 42 30 26.2 30 15C30 6.7 23.3 0 15 0Z" fill="#ff4d7a"/><circle cx="15" cy="15" r="6" fill="white" fill-opacity="0.9"/></svg>`;
+    return el;
   }
 
-  /* ══ FETCH POLLEN ══ */
+  /* ══ FETCH POLLEN (with cache + cancellation) ══ */
+  // CAMS Europe has a 0.1° grid, so clicks within the same 0.1° cell share one forecast.
+  const POINT_TTL_MS = 60*60*1000;
+  const pointCache = new Map();
+  let pointAbort = null, pointSeq = 0;
   let lastLocLabel = null;
 
+  function readPointCache(key) {
+    let hit = pointCache.get(key);
+    if (!hit) {
+      try { const s = sessionStorage.getItem('pf:'+key); if (s) { hit = JSON.parse(s); pointCache.set(key, hit); } } catch (e) {}
+    }
+    return (hit && Date.now()-hit.t < POINT_TTL_MS) ? hit.d : null;
+  }
+  function writePointCache(key, d) {
+    const entry = {t:Date.now(), d};
+    pointCache.set(key, entry);
+    try { sessionStorage.setItem('pf:'+key, JSON.stringify(entry)); } catch (e) {}
+  }
+
+  async function getPointForecast(lat, lng) {
+    const qLat = (Math.round(lat*10)/10).toFixed(1), qLng = (Math.round(lng*10)/10).toFixed(1);
+    const key = qLat+','+qLng;
+    const cached = readPointCache(key);
+    if (cached) return cached;
+    if (pointAbort) pointAbort.abort();
+    pointAbort = new AbortController();
+    const pollenKeys = POLLEN_TYPES.map(p=>p.key).join(',');
+    const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${qLat}&longitude=${qLng}&hourly=${pollenKeys}&forecast_days=4&domains=cams_europe&timezone=auto`;
+    const resp = await fetch(url, {signal: pointAbort.signal});
+    if (!resp.ok) throw new Error('API error '+resp.status);
+    const data = await resp.json();
+    writePointCache(key, data);
+    return data;
+  }
+
   async function fetchAndDisplayPollen(lat, lng, locationLabel) {
+    const seq = ++pointSeq;
     lastLocLabel=locationLabel;
     const reportDiv=document.getElementById('pollen-report');
     const listDiv=document.getElementById('pollen-list');
     const tabsDiv=document.getElementById('day-tabs');
     const bar=document.getElementById('summary-bar');
+    document.getElementById('hint-text').classList.add('gone');
+    if (window.innerWidth <= 720) document.getElementById('heat-panel').classList.add('collapsed');
 
     reportDiv.style.display='flex';
     tabsDiv.innerHTML=''; bar.style.display='none';
     listDiv.innerHTML=`<p class="loading-msg">${t('fetching')}</p>`;
     document.getElementById('report-loc').textContent=locationLabel||`${lat.toFixed(3)}°N  ${lng.toFixed(3)}°E`;
 
-    if (activeMarker) { activeMarker.setLatLng([lat,lng]); }
-    else {
-      activeMarker=L.marker([lat,lng],{icon:L.divIcon({className:'',html:pinSVG(),iconSize:[30,42],iconAnchor:[15,42]})}).addTo(map);
-    }
+    if (activeMarker) activeMarker.setLngLat([lng,lat]);
+    else activeMarker = new maplibregl.Marker({element:pinElement(), anchor:'bottom'}).setLngLat([lng,lat]).addTo(map);
+
+    // the chart is the next thing people tend to open; fetch Chart.js while idle
+    (window.requestIdleCallback || setTimeout)(() => loadChartJs().catch(()=>{}));
 
     try {
-      const pollenKeys=POLLEN_TYPES.map(p=>p.key).join(',');
-      const url=`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&hourly=${pollenKeys}&forecast_days=6&timezone=auto`;
-      const resp=await fetch(url);
-      if (!resp.ok) throw new Error('API error '+resp.status);
-      const data=await resp.json();
+      const data = await getPointForecast(lat, lng);
+      if (seq !== pointSeq) return;               // a newer click superseded this one
       pollenByDay=buildDayData(data);
       const days=Object.keys(pollenByDay);
       if (!days.length){listDiv.innerHTML=`<p class="loading-msg">${t('no_data')}</p>`;return;}
-      const todayKey=new Date().toISOString().slice(0,10);
+      const todayKey=localDateKey(0);
       activeDayKey=days.includes(todayKey)?todayKey:days[0];
       renderPollenTypeFilter(); renderDayTabs(); renderSummaryBar(activeDayKey); renderHourList(activeDayKey);
     } catch(err){
-      listDiv.innerHTML=`<p class="loading-msg">${t('fetch_error')}<br><small>${err.message}</small></p>`;
+      if (err.name === 'AbortError' || seq !== pointSeq) return;
+      listDiv.innerHTML=`<p class="loading-msg">${t('fetch_error')}<br><small>${escapeHtml(err.message)}</small></p>`;
     }
   }
 
   /* ══ MAP CLICK ══ */
-  async function onMapClick(e) {
-    if (isDrawingMode) return;
-    const {lat,lng}=e.latlng;
+  function onMapClick(e) {
+    const {lat,lng}=e.lngLat;
+    if (isDrawingMode) {
+      placeDrawCircle(e.lngLat);
+      openReviewModal(e.lngLat);
+      isDrawingMode=false; updateDrawBtn();
+      return;
+    }
+    // clicks on a review pin open its popup instead
+    if (map.getLayer('reviews-layer') && map.queryRenderedFeatures(e.point,{layers:['reviews-layer']}).length) return;
     if (!isInEurope(lat,lng)){showOobToast();return;}
-    await fetchAndDisplayPollen(lat,lng,`${lat.toFixed(3)}°N  ${lng.toFixed(3)}°E`);
+    fetchAndDisplayPollen(lat,lng,`${lat.toFixed(3)}°N  ${lng.toFixed(3)}°E`);
   }
 
-  /* ══ SEARCH ══ */
-  let searchTimeout=null;
+  /* ══ SEARCH (Photon: open-source OSM geocoder built for search-as-you-type) ══ */
+  let searchTimeout=null, searchAbort=null, lastResults=[];
+  const searchCache = new Map();
+
   document.addEventListener('DOMContentLoaded',()=>{
     const input=document.getElementById('search-input');
-    input.addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
+    input.addEventListener('keydown',e=>{if(e.key==='Enter'){clearTimeout(searchTimeout);doSearch();}});
     input.addEventListener('input',()=>{
       clearTimeout(searchTimeout);
       const q=input.value.trim();
       if (q.length<2){document.getElementById('search-results').style.display='none';return;}
-      searchTimeout=setTimeout(()=>doSearch(true),500);
+      searchTimeout=setTimeout(()=>doSearch(),300);
+    });
+    document.getElementById('search-results').addEventListener('click', e => {
+      const item = e.target.closest('[data-idx]');
+      if (item) selectSearchResult(lastResults[+item.dataset.idx]);
     });
   });
 
-  async function doSearch(autocomplete=false) {
-    const input=document.getElementById('search-input');
-    const q=input.value.trim();
+  async function doSearch() {
+    const q=document.getElementById('search-input').value.trim();
     if (!q) return;
     const resultsDiv=document.getElementById('search-results');
     resultsDiv.style.display='block';
-    resultsDiv.innerHTML=`<div class="search-result-item"><span class="result-name">${t('searching')}</span></div>`;
-    try {
-      const url=`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=1`;
-      const resp=await fetch(url,{headers:{'Accept-Language':currentLang}});
-      const data=await resp.json();
-      if (!data.length){resultsDiv.innerHTML=`<div class="search-result-item"><span class="result-name">${t('no_results')}</span></div>`;return;}
-      resultsDiv.innerHTML=data.map(r=>{
-        const name=r.display_name.split(',')[0];
-        const country=r.address?.country||r.display_name.split(',').slice(-1)[0].trim();
-        return `<div class="search-result-item" onclick="selectSearchResult(${r.lat},${r.lon},'${name.replace(/'/g,"\\'")}')" >
-          <span class="result-icon">📍</span><span class="result-name">${name}</span><span class="result-country">${country}</span>
-        </div>`;
-      }).join('');
-    } catch(err){
-      resultsDiv.innerHTML=`<div class="search-result-item"><span class="result-name">⚠ Error</span></div>`;
+    const lang = ['en','de','fr'].includes(currentLang) ? currentLang : 'default';
+    const key = lang+'|'+q.toLowerCase();
+    let results = searchCache.get(key);
+    if (!results) {
+      resultsDiv.innerHTML=`<div class="search-result-item"><span class="result-name">${t('searching')}</span></div>`;
+      if (searchAbort) searchAbort.abort();
+      searchAbort = new AbortController();
+      try {
+        const b = EUROPE_BOUNDS;
+        const url=`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lang=${lang}&bbox=${b.west},${b.south},${b.east},${b.north}`;
+        const resp=await fetch(url,{signal:searchAbort.signal});
+        const data=await resp.json();
+        results = (data.features||[]).map(f=>{
+          const p=f.properties||{};
+          const sub=[p.city&&p.city!==p.name?p.city:null, p.state, p.country].filter(Boolean);
+          return { name:p.name||sub[0]||q, country:sub.slice(-2).join(', '), lat:f.geometry.coordinates[1], lng:f.geometry.coordinates[0] };
+        });
+        searchCache.set(key, results);
+      } catch(err){
+        if (err.name==='AbortError') return;
+        resultsDiv.innerHTML=`<div class="search-result-item"><span class="result-name">⚠ Error</span></div>`;
+        return;
+      }
     }
+    lastResults = results;
+    if (!results.length){resultsDiv.innerHTML=`<div class="search-result-item"><span class="result-name">${t('no_results')}</span></div>`;return;}
+    resultsDiv.innerHTML=results.map((r,i)=>`<div class="search-result-item" data-idx="${i}">
+        <span class="result-icon">📍</span><span class="result-name">${escapeHtml(r.name)}</span><span class="result-country">${escapeHtml(r.country)}</span>
+      </div>`).join('');
   }
 
-  function selectSearchResult(lat,lng,name){
+  function selectSearchResult(r){
+    if (!r) return;
     document.getElementById('search-results').style.display='none';
-    document.getElementById('search-input').value=name;
-    lat=parseFloat(lat); lng=parseFloat(lng);
-    if (!isInEurope(lat,lng)){showOobToast();return;}
-    map.setView([lat,lng],10,{animate:true});
-    fetchAndDisplayPollen(lat,lng,name);
+    document.getElementById('search-input').value=r.name;
+    if (!isInEurope(r.lat,r.lng)){showOobToast();return;}
+    map.flyTo({center:[r.lng,r.lat],zoom:9,speed:1.6});
+    fetchAndDisplayPollen(r.lat,r.lng,r.name);
   }
 
-  /* ══ CHART MODAL ══ */
-  let pollenChart=null;
+  /* ══ CHART MODAL (Chart.js is loaded only when needed) ══ */
+  let pollenChart=null, chartJsPromise=null;
   let chartSelectedTypes=new Set(POLLEN_TYPES.map(p=>p.key));
   let chartSelectedDays=new Set();
 
+  function loadChartJs() {
+    if (window.Chart) return Promise.resolve();
+    return chartJsPromise ||= new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+      s.onload = resolve;
+      s.onerror = () => { chartJsPromise = null; reject(new Error('Chart.js failed to load')); };
+      document.head.appendChild(s);
+    });
+  }
+
   function openChartModal() {
     if (!Object.keys(pollenByDay).length) return;
+    loadChartJs().catch(()=>{});
     chartSelectedDays=new Set([activeDayKey]);
 
     const typesWrap=document.getElementById('chart-type-chips');
@@ -688,7 +878,7 @@
     POLLEN_TYPES.forEach(pt=>{
       const chip=document.createElement('button');
       chip.className='chart-chip'+(chartSelectedTypes.has(pt.key)?' active':'');
-      chip.textContent=pt.emoji+' '+(TRANSLATIONS[currentLang]?.pollen_types_labels?.[pt.labelKey]||pt.labelKey);
+      chip.textContent=pt.emoji+' '+typeLabel(pt.labelKey);
       chip.onclick=()=>{
         if (chartSelectedTypes.has(pt.key)) chartSelectedTypes.delete(pt.key);
         else chartSelectedTypes.add(pt.key);
@@ -723,11 +913,12 @@
     if (pollenChart){pollenChart.destroy();pollenChart=null;}
   }
 
-  function renderChart() {
+  async function renderChart() {
     if (!chartSelectedTypes.size||!chartSelectedDays.size) return;
-    const isLight=document.body.classList.contains('light-theme');
-    const gridColor=isLight?'rgba(0,0,0,0.07)':'rgba(255,255,255,0.07)';
-    const labelColor=isLight?'#1a1e21':'#e8edf0';
+    try { await loadChartJs(); } catch (e) { document.getElementById('chart-placeholder').textContent = t('fetch_error'); return; }
+    const light=isLight();
+    const gridColor=light?'rgba(0,0,0,0.07)':'rgba(255,255,255,0.07)';
+    const labelColor=light?'#1a1e21':'#e8edf0';
 
     const sortedDays=Object.keys(pollenByDay).filter(d=>chartSelectedDays.has(d)).sort();
     const allPoints=[];
@@ -738,15 +929,12 @@
     });
 
     const labels=allPoints.map(p=>p.label);
-    const datasets=POLLEN_TYPES.filter(pt=>chartSelectedTypes.has(pt.key)).map(pt=>{
-      const ptLabel=TRANSLATIONS[currentLang]?.pollen_types_labels?.[pt.labelKey]||pt.labelKey;
-      return {
-        label:pt.emoji+' '+ptLabel,
-        data:allPoints.map(p=>{ const v=p.hour[pt.key]; return v!==null?Math.round(v):null; }),
-        borderColor:pt.color, backgroundColor:pt.color+'22',
-        borderWidth:2, pointRadius:3, pointHoverRadius:6, tension:0.35, fill:false, spanGaps:true
-      };
-    });
+    const datasets=POLLEN_TYPES.filter(pt=>chartSelectedTypes.has(pt.key)).map(pt=>({
+      label:pt.emoji+' '+typeLabel(pt.labelKey),
+      data:allPoints.map(p=>{ const v=p.hour[pt.key]; return v!==null?Math.round(v):null; }),
+      borderColor:pt.color, backgroundColor:pt.color+'22',
+      borderWidth:2, pointRadius:3, pointHoverRadius:6, tension:0.35, fill:false, spanGaps:true
+    }));
 
     document.getElementById('chart-placeholder').style.display='none';
     const canvas=document.getElementById('pollen-chart');
@@ -786,126 +974,328 @@
     });
   }
 
-  /* ══ EUROPE BLACKOUT OVERLAY ══ */
-  function addEuropeBlackout() {
-    const EuropeMaskLayer = L.Layer.extend({
-      onAdd(map) {
-        this._map=map;
-        const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
-        svg.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:300;';
-        this._svg=svg;
-        map.getPanes().overlayPane.appendChild(svg);
-        map.on('move zoom viewreset moveend zoomend',this._update,this);
-        this._update();
-      },
-      onRemove(map){
-        map.getPanes().overlayPane.removeChild(this._svg);
-        map.off('move zoom viewreset moveend zoomend',this._update,this);
-      },
-      _update(){
-        const map=this._map, svg=this._svg, size=map.getSize();
-        svg.setAttribute('width',size.x);
-        svg.setAttribute('height',size.y);
-        svg.setAttribute('viewBox',`0 0 ${size.x} ${size.y}`);
-        const nw=map.latLngToContainerPoint([EUROPE_BOUNDS.north,EUROPE_BOUNDS.west]);
-        const se=map.latLngToContainerPoint([EUROPE_BOUNDS.south,EUROPE_BOUNDS.east]);
-        const rx=Math.min(nw.x,se.x), ry=Math.min(nw.y,se.y);
-        const rw=Math.abs(se.x-nw.x), rh=Math.abs(se.y-nw.y);
-        // evenodd: world rect minus Europe hole = dark outside Europe
-        const path=`M0,0 H${size.x} V${size.y} H0 Z M${rx},${ry} H${rx+rw} V${ry+rh} H${rx} Z`;
-        svg.innerHTML=`<path d="${path}" fill="rgba(3,9,14,0.86)" fill-rule="evenodd"/>
-          <rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="none" stroke="rgba(255,77,122,0.22)" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+  /* ══ POLLEN HEATMAP ══
+     The server keeps a snapshot of the CAMS forecast on a regular lat/lon grid
+     (daily peak per pollen type, refreshed twice a day). The browser bilinearly
+     interpolates it onto a canvas whose rows are spaced in Web-Mercator y, so it
+     lines up with the basemap, and hands it to MapLibre as an image layer. */
+  const HEAT_STOPS = [   // value (grains/m³) → [r,g,b,a]; matches the Low/Mod/High scale used in the panel
+    [0,    [129,199,132,0.00]],
+    [1.5,  [129,199,132,0.28]],
+    [30,   [255,213, 79,0.55]],
+    [80,   [255,112, 67,0.68]],
+    [200,  [229, 57, 53,0.75]],
+    [500,  [192, 38,211,0.80]],
+  ];
+  const HEAT_LUT_MAX = 600, HEAT_LUT_RES = 4;   // LUT entries per grain/m³ → smooth edges
+  const HEAT_LUT = (() => {
+    const n = HEAT_LUT_MAX*HEAT_LUT_RES;
+    const lut = new Uint8ClampedArray((n+1)*4);
+    for (let idx=0; idx<=n; idx++) {
+      const v = idx/HEAT_LUT_RES;
+      let k=0; while (k<HEAT_STOPS.length-2 && v>HEAT_STOPS[k+1][0]) k++;
+      const [v0,c0]=HEAT_STOPS[k], [v1,c1]=HEAT_STOPS[k+1];
+      const f=Math.max(0,Math.min(1,(v-v0)/(v1-v0)));
+      for (let ch=0; ch<4; ch++) {
+        const x=c0[ch]+(c1[ch]-c0[ch])*f;
+        lut[idx*4+ch] = ch===3 ? Math.round(x*255) : Math.round(x);
       }
+    }
+    return lut;
+  })();
+
+  const heat = { grid:null, status:'loading', enabled:true, dayIdx:0, canvas:null, dataUrl:null, combined:{} };
+  try { if (localStorage.getItem('anthoscope-heat') === 'off') heat.enabled = false; } catch (e) {}
+
+  function heatLegendCss() {
+    const ticks = [1,30,80,200,500];
+    const stops = ticks.map((v,i)=>{ const o=v*HEAT_LUT_RES*4, c=HEAT_LUT; return `rgba(${c[o]},${c[o+1]},${c[o+2]},${Math.max(0.35,c[o+3]/255)}) ${i*25}%`; });
+    return `linear-gradient(90deg, ${stops.join(', ')})`;
+  }
+
+  async function loadHeatGrid() {
+    try {
+      const resp = await fetch('/api/pollen/grid');
+      if (!resp.ok) throw new Error(resp.status);
+      const g = await resp.json();
+      g.values = Object.fromEntries(Object.entries(g.values).map(([k,days]) => [k, days.map(a => Int32Array.from(a))]));
+      heat.grid = g; heat.status = 'ok';
+      const todayIdx = g.days.indexOf(localDateKey(0));
+      heat.dayIdx = todayIdx >= 0 ? todayIdx : 0;
+    } catch (e) {
+      heat.status = 'unavailable';
+    }
+    renderHeatControls();
+    renderHeat();
+  }
+
+  function heatValues() {
+    const g = heat.grid, d = heat.dayIdx;
+    if (activePollenType !== 'all') return g.values[activePollenType]?.[d] || null;
+    if (!heat.combined[d]) {                     // "All" = highest of any pollen type per cell
+      const out = new Int32Array(g.nx*g.ny).fill(-1);
+      for (const key of g.types) {
+        const arr = g.values[key]?.[d]; if (!arr) continue;
+        for (let i=0;i<out.length;i++) if (arr[i] > out[i]) out[i] = arr[i];
+      }
+      heat.combined[d] = out;
+    }
+    return heat.combined[d];
+  }
+
+  function drawHeatCanvas(vals) {
+    const g = heat.grid, [W0,S0,E0,N0] = g.bbox, nx=g.nx, ny=g.ny, step=g.step;
+    const W = Math.min(1024, nx*6), H = Math.min(1024, ny*8);
+    if (!heat.canvas) heat.canvas = document.createElement('canvas');
+    const cv = heat.canvas; cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    const img = ctx.createImageData(W, H), px = img.data;
+    const merc = lat => Math.log(Math.tan(Math.PI/4 + lat*Math.PI/360));
+    const yN = merc(N0), yS = merc(S0);
+    const colI = new Int32Array(W), colF = new Float32Array(W);
+    for (let x=0;x<W;x++){ const gx = ((x+0.5)/W)*(E0-W0)/step; const i=Math.min(nx-2,Math.max(0,Math.floor(gx))); colI[x]=i; colF[x]=Math.min(1,Math.max(0,gx-i)); }
+    let nonzero = false;
+    for (let y=0;y<H;y++){
+      const my = yN - ((y+0.5)/H)*(yN-yS);
+      const lat = (2*Math.atan(Math.exp(my)) - Math.PI/2)*180/Math.PI;
+      const gy = (lat - S0)/step;
+      const j = Math.min(ny-2,Math.max(0,Math.floor(gy))), fy = Math.min(1,Math.max(0,gy-j));
+      const r0 = j*nx, r1 = (j+1)*nx;
+      for (let x=0;x<W;x++){
+        const i = colI[x], fx = colF[x];
+        const a=vals[r0+i], b=vals[r0+i+1], c=vals[r1+i], d=vals[r1+i+1];
+        let sum=0, w=0, ww;
+        if (a>=0){ ww=(1-fx)*(1-fy); sum+=a*ww; w+=ww; }
+        if (b>=0){ ww=fx*(1-fy);     sum+=b*ww; w+=ww; }
+        if (c>=0){ ww=(1-fx)*fy;     sum+=c*ww; w+=ww; }
+        if (d>=0){ ww=fx*fy;         sum+=d*ww; w+=ww; }
+        const o = (y*W+x)*4;
+        if (w < 0.25) { px[o+3]=0; continue; }
+        const v = Math.min(HEAT_LUT_MAX, sum/w);
+        if (v >= 1) nonzero = true;
+        const l = Math.round(v*HEAT_LUT_RES)*4;
+        px[o]=HEAT_LUT[l]; px[o+1]=HEAT_LUT[l+1]; px[o+2]=HEAT_LUT[l+2]; px[o+3]=HEAT_LUT[l+3];
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return nonzero;
+  }
+
+  function heatCoords() {
+    const [w,s,e,n] = heat.grid.bbox;
+    return [[w,n],[e,n],[e,s],[w,s]];
+  }
+
+  function ensureHeatLayer() {
+    if (!map || !styleReady || !heat.dataUrl) return;
+    const src = map.getSource('pollen-heat');
+    if (src) { src.updateImage({url:heat.dataUrl, coordinates:heatCoords()}); }
+    else {
+      map.addSource('pollen-heat', {type:'image', url:heat.dataUrl, coordinates:heatCoords()});
+      map.addLayer({id:'pollen-heat-layer', type:'raster', source:'pollen-heat',
+        paint:{'raster-opacity':0.9,'raster-fade-duration':0,'raster-resampling':'linear'}}, firstSymbolLayerId());
+    }
+    map.setLayoutProperty('pollen-heat-layer','visibility', heat.enabled ? 'visible' : 'none');
+  }
+
+  function renderHeat() {
+    const note = document.getElementById('heat-note');
+    note.style.display = 'none';
+    if (!heat.grid) return;
+    if (!heat.enabled) { if (map?.getLayer('pollen-heat-layer')) map.setLayoutProperty('pollen-heat-layer','visibility','none'); return; }
+    const vals = heatValues();
+    if (!vals) return;
+    const nonzero = drawHeatCanvas(vals);
+    heat.dataUrl = heat.canvas.toDataURL('image/png');
+    ensureHeatLayer();
+    if (!nonzero) { note.textContent = t('heat_quiet'); note.style.display = 'block'; }
+  }
+
+  function renderHeatControls() {
+    makeTypeChips(document.getElementById('heat-types'), 'type-chip');
+    const daysDiv = document.getElementById('heat-days');
+    const meta = document.getElementById('heat-meta');
+    daysDiv.innerHTML = '';
+    document.getElementById('heat-toggle').checked = heat.enabled;
+    document.getElementById('heat-legend-bar').style.background = heatLegendCss();
+    if (heat.status === 'loading') { meta.textContent = t('heat_loading'); return; }
+    if (heat.status !== 'ok') { meta.textContent = t('heat_unavailable'); return; }
+    const today = localDateKey(0);
+    heat.grid.days.forEach((dayKey, idx) => {
+      if (dayKey < today && idx < heat.grid.days.length-1) return;   // hide days already over
+      const b = document.createElement('button');
+      b.className = 'day-tab' + (idx===heat.dayIdx ? ' active' : '');
+      b.textContent = fmtDateLabel(dayKey);
+      b.onclick = () => { heat.dayIdx = idx; renderHeatControls(); renderHeat(); };
+      daysDiv.appendChild(b);
     });
-    blackoutLayer=new EuropeMaskLayer();
-    blackoutLayer.addTo(map);
+    meta.textContent = t('heat_meta').replace('{ago}', timeAgo(heat.grid.generated_at));
+  }
+
+  function timeAgo(iso) {
+    const mins = Math.round((Date.now() - Date.parse(iso)) / 60000);
+    const rtf = new Intl.RelativeTimeFormat(LOCALES[currentLang]||'en', {numeric:'auto'});
+    if (Math.abs(mins) < 60) return rtf.format(-mins, 'minute');
+    const hrs = Math.round(mins/60);
+    if (Math.abs(hrs) < 48) return rtf.format(-hrs, 'hour');
+    return rtf.format(-Math.round(hrs/24), 'day');
+  }
+
+  function toggleHeatPanel() { document.getElementById('heat-panel').classList.toggle('collapsed'); }
+
+  /* ══ MAP OVERLAYS (re-added every time the basemap style changes) ══ */
+  function firstSymbolLayerId() {
+    return map.getStyle().layers.find(l => l.type === 'symbol')?.id;
+  }
+
+  function europeMaskGeoJSON() {
+    const {west:w,east:e,south:s,north:n} = EUROPE_BOUNDS;
+    const box = [[w,s],[e,s],[e,n],[w,n],[w,s]];
+    return { type:'FeatureCollection', features:[
+      { type:'Feature', properties:{}, geometry:{ type:'Polygon', coordinates:[
+        [[-180,-85],[180,-85],[180,85],[-180,85],[-180,-85]], box.slice().reverse() ] } },
+      { type:'Feature', properties:{}, geometry:{ type:'LineString', coordinates:box } },
+    ]};
+  }
+
+  function circlePolygon(center, radiusKm, steps=64) {
+    const coords=[], lat=center.lat*Math.PI/180;
+    for (let i=0;i<=steps;i++){
+      const a=(i/steps)*2*Math.PI;
+      coords.push([center.lng + (radiusKm/(111.32*Math.cos(lat)))*Math.cos(a), center.lat + (radiusKm/110.574)*Math.sin(a)]);
+    }
+    return { type:'Feature', properties:{}, geometry:{ type:'Polygon', coordinates:[coords] } };
+  }
+
+  function addOverlays() {
+    styleReady = true;
+    const before = firstSymbolLayerId();
+
+    if (heat.dataUrl) ensureHeatLayer();
+
+    map.addSource('draw-circle', {type:'geojson', data:drawGeo});
+    map.addLayer({id:'draw-circle-fill', type:'fill', source:'draw-circle', paint:{'fill-color':'#ff4d7a','fill-opacity':0.2}}, before);
+    map.addLayer({id:'draw-circle-line', type:'line', source:'draw-circle', paint:{'line-color':'#ff4d7a','line-width':2}}, before);
+
+    map.addSource('europe-mask', {type:'geojson', data:europeMaskGeoJSON()});
+    map.addLayer({id:'europe-mask-fill', type:'fill', source:'europe-mask',
+      filter:['==',['geometry-type'],'Polygon'],
+      paint:{'fill-color': isLight() ? '#dfe3e8' : '#03090e', 'fill-opacity': isLight() ? 0.8 : 0.86}});
+    map.addLayer({id:'europe-mask-line', type:'line', source:'europe-mask',
+      filter:['==',['geometry-type'],'LineString'],
+      paint:{'line-color':'rgba(255,77,122,0.35)','line-width':1.5,'line-dasharray':[3,2]}});
+
+    if (reviewPinImage && !map.hasImage('review-pin')) map.addImage('review-pin', reviewPinImage);
+    map.addSource('reviews', {type:'geojson', data:reviewsGeo});
+    map.addLayer({id:'reviews-layer', type:'symbol', source:'reviews',
+      layout:{'icon-image':'review-pin','icon-size':0.31,'icon-allow-overlap':true,'icon-ignore-placement':true}});
+  }
+
+  /* ══ THEME ══ */
+  function applyTheme(theme, updateMap) {
+    document.body.classList.toggle('light-theme', theme === 'light');
+    document.getElementById('theme-toggle').checked = theme === 'light';
+    try { localStorage.setItem('anthoscope-theme', theme); } catch (e) {}
+    if (updateMap && map) { styleReady = false; } else return;
+    map.setStyle(theme === 'light' ? STYLE_LIGHT : STYLE_DARK, {diff:false});
   }
 
   /* ══ MAP INIT ══ */
   function initMap() {
-    const europeBounds=L.latLngBounds(
-      L.latLng(EUROPE_BOUNDS.south,EUROPE_BOUNDS.west),
-      L.latLng(EUROPE_BOUNDS.north,EUROPE_BOUNDS.east)
-    );
+    applyTheme(document.documentElement.dataset.theme || 'dark', false);
+    const b = EUROPE_BOUNDS;
 
-    map=L.map('map',{
-      zoomControl:false,
-      maxBounds:europeBounds,
-      maxBoundsViscosity:1.0,   // hard wall — cannot pan outside
-      minZoom:4,                // cannot zoom out far enough to see outside
-    }).setView([48.85,2.35],5);
+    map = new maplibregl.Map({
+      container:'map',
+      style: isLight() ? STYLE_LIGHT : STYLE_DARK,
+      bounds: [[b.west,b.south],[b.east,b.north]],
+      fitBoundsOptions: {padding:6},
+      maxBounds: [[-100,12],[120,83]],   // loose enough that all of Europe fits on wide screens; the mask darkens the rest
+      maxZoom: 18,
+      dragRotate:false, pitchWithRotate:false, touchPitch:false,
+      renderWorldCopies:false,
+      attributionControl:{compact:true, customAttribution:POLLEN_ATTRIBUTION},
+    });
+    map.touchZoomRotate.disableRotation();
+    map.keyboard.disableRotation();
 
-    // Fit to Europe so viewport never starts outside
-    map.fitBounds(europeBounds,{padding:[6,6]});
-
-    tileLayer=L.tileLayer(DARK_TILES,{
-      attribution:'&copy; OpenStreetMap contributors &copy; CARTO',
-      subdomains:'abcd', maxZoom:19
-    }).addTo(map);
-
-    // Dark overlay for everything outside Europe
-    addEuropeBlackout();
-
-    map.on('click',onMapClick);
-
-    document.getElementById('theme-toggle').addEventListener('change',e=>{
-      if (e.target.checked){document.body.classList.add('light-theme');tileLayer.setUrl(LIGHT_TILES);}
-      else {document.body.classList.remove('light-theme');tileLayer.setUrl(DARK_TILES);}
+    map.on('style.load', addOverlays);
+    map.on('click', onMapClick);
+    map.on('click', 'reviews-layer', e => {
+      const f = e.features?.[0]; if (!f) return;
+      const el = document.createElement('div');
+      const title = document.createElement('b'); title.textContent = t('review_label');
+      const body = document.createElement('div'); body.textContent = f.properties.text || '';
+      el.append(title, body);
+      new maplibregl.Popup({offset:14, maxWidth:'260px'}).setLngLat(f.geometry.coordinates).setDOMContent(el).addTo(map);
     });
 
-    document.getElementById('drawAreaBtn').addEventListener('click',toggleDrawingMode);
+    map.loadImage('/static/point.png').then(res => {
+      reviewPinImage = res.data;
+      if (styleReady && !map.hasImage('review-pin')) { map.addImage('review-pin', reviewPinImage); refreshReviewsSource(); }
+    }).catch(e => console.warn('review pin icon:', e));
+
+    document.getElementById('theme-toggle').addEventListener('change', e => applyTheme(e.target.checked ? 'light' : 'dark', true));
+    document.getElementById('heat-toggle').addEventListener('change', e => {
+      heat.enabled = e.target.checked;
+      try { localStorage.setItem('anthoscope-heat', heat.enabled ? 'on' : 'off'); } catch (err) {}
+      renderHeat();
+    });
+    document.getElementById('drawAreaBtn').addEventListener('click', toggleDrawingMode);
+
+    if (currentLang !== 'en') setLanguage(currentLang); else applyTranslations();
     loadReviews();
-    renderPollenTypeFilter();
+    loadHeatGrid();
   }
 
   /* ══ REVIEWS ══ */
+  function reviewFeature(r) {
+    return { type:'Feature', properties:{text:r.review_text||''}, geometry:{type:'Point', coordinates:[+r.center_lng, +r.center_lat]} };
+  }
+  function refreshReviewsSource() { map.getSource('reviews')?.setData(reviewsGeo); }
+
   async function loadReviews(){
-    reviewMarkers.forEach(m=>map.removeLayer(m)); reviewMarkers=[];
     try {
       const res=await fetch('/api/reviews'), data=await res.json();
       if (data.success&&Array.isArray(data.reviews)){
-        data.reviews.forEach(r=>{
-          const m=L.marker([r.center_lat,r.center_lng],{icon:L.icon({iconUrl:'/static/point.png',iconSize:[40,40],iconAnchor:[20,20]})}).addTo(map);
-          m.bindPopup(`<b>Review</b><br>${r.review_text}`);
-          reviewMarkers.push(m);
-        });
+        reviewsGeo = { type:'FeatureCollection', features:data.reviews.map(reviewFeature) };
+        refreshReviewsSource();
       }
     } catch(e){console.error('Could not load reviews:',e);}
   }
 
-  function toggleDrawingMode(){
-    isDrawingMode=!isDrawingMode;
+  function updateDrawBtn() {
     const btn=document.getElementById('drawAreaBtn');
-    if (isDrawingMode){
-      btn.textContent=t('draw_btn_active'); btn.classList.add('active-draw');
-      map.off('click',onMapClick);
-      map.once('click',e=>{
-        drawingCircle=L.circle(e.latlng,{radius:2500,color:'#ff4d7a',fillOpacity:0.2,weight:2}).addTo(map);
-        openReviewModal(e.latlng);
-        isDrawingMode=false; btn.textContent=t('draw_btn'); btn.classList.remove('active-draw');
-      });
-    } else {
-      btn.textContent=t('draw_btn'); btn.classList.remove('active-draw');
-      map.off('click'); map.on('click',onMapClick);
-    }
+    btn.textContent = isDrawingMode ? t('draw_btn_active') : t('draw_btn');
+    btn.classList.toggle('active-draw', isDrawingMode);
   }
 
-  function openReviewModal(latlng){
-    document.getElementById('area-summary').textContent=`Lat: ${latlng.lat.toFixed(4)}  |  Lng: ${latlng.lng.toFixed(4)}`;
+  function toggleDrawingMode(){
+    isDrawingMode=!isDrawingMode;
+    updateDrawBtn();
+  }
+
+  function placeDrawCircle(lngLat) {
+    drawGeo = { type:'FeatureCollection', features:[circlePolygon(lngLat, 2.5)] };
+    map.getSource('draw-circle')?.setData(drawGeo);
+  }
+
+  function openReviewModal(lngLat){
+    document.getElementById('area-summary').textContent=`Lat: ${lngLat.lat.toFixed(4)}  |  Lng: ${lngLat.lng.toFixed(4)}`;
     document.getElementById('rev-text').value='';
     document.getElementById('review-modal').classList.add('visible');
-    window.currentLatlng=latlng;
+    window.currentLatlng=lngLat;
   }
 
   function closePollenReport(){
     document.getElementById('pollen-report').style.display='none';
-    if (activeMarker){map.removeLayer(activeMarker);activeMarker=null;}
+    if (activeMarker){activeMarker.remove();activeMarker=null;}
   }
 
   function closeReviewModal(){
     document.getElementById('review-modal').classList.remove('visible');
-    if (drawingCircle){map.removeLayer(drawingCircle);drawingCircle=null;}
-    map.off('click'); map.on('click',onMapClick);
+    drawGeo = { type:'FeatureCollection', features:[] };
+    map.getSource('draw-circle')?.setData(drawGeo);
   }
 
   async function submitReview(){
@@ -915,11 +1305,16 @@
     try {
       const res=await fetch('/api/reviews',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       const result=await res.json();
-      if (result.success){closeReviewModal();loadReviews();}
+      if (result.success){
+        // show it immediately (the GET endpoint is CDN-cached for ~30 s)
+        reviewsGeo.features.unshift(reviewFeature({review_text:reviewText, center_lat:payload.centerLat, center_lng:payload.centerLng}));
+        refreshReviewsSource();
+        closeReviewModal();
+      }
     } catch(e){console.error('Submit failed:',e);}
   }
 
-  window.onload=initMap;
+  document.addEventListener('DOMContentLoaded', initMap);
   </script>
 </body>
 </html>
