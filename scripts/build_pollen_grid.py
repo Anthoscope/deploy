@@ -69,6 +69,35 @@ def build_grid(step: float):
     return nx, ny, points
 
 
+class BadRequest(Exception):
+    """Open-Meteo rejected the request (e.g. a point outside the model domain)."""
+
+
+def _error_reason(e):
+    try:
+        body = e.read().decode("utf-8", "replace")
+        return json.loads(body).get("reason") or body[:300]
+    except Exception:
+        return str(e)
+
+
+def fetch_points(points):
+    """fetch_batch, but if Open-Meteo rejects the batch, split it to find the
+    offending points and return None for those instead of failing the run."""
+    try:
+        results = fetch_batch(points)
+        if len(results) != len(points):
+            raise BadRequest(f"expected {len(points)} results, got {len(results)}")
+        return results
+    except BadRequest as e:
+        if len(points) == 1:
+            print(f"  skipping {points[0]}: {e}", flush=True)
+            return [None]
+        print(f"  batch of {len(points)} rejected ({e}); splitting", flush=True)
+        mid = len(points) // 2
+        return fetch_points(points[:mid]) + fetch_points(points[mid:])
+
+
 def fetch_batch(points, retries=5):
     params = {
         "latitude": ",".join(f"{p[0]:.4f}" for p in points),
@@ -88,12 +117,15 @@ def fetch_batch(points, retries=5):
                 data = json.loads(resp.read().decode("utf-8"))
             return data if isinstance(data, list) else [data]
         except urllib.error.HTTPError as e:
+            reason = _error_reason(e)
             if e.code in (429, 500, 502, 503, 504) and attempt < retries - 1:
-                print(f"  HTTP {e.code}, retrying in {delay}s", flush=True)
+                print(f"  HTTP {e.code} ({reason}), retrying in {delay}s", flush=True)
                 time.sleep(delay)
                 delay *= 2
                 continue
-            raise
+            if e.code == 400:
+                raise BadRequest(reason) from None
+            raise RuntimeError(f"Open-Meteo HTTP {e.code}: {reason}") from None
         except (urllib.error.URLError, TimeoutError) as e:
             if attempt < retries - 1:
                 print(f"  network error ({e}), retrying in {delay}s", flush=True)
@@ -137,19 +169,22 @@ def build_snapshot(step: float):
           f"≈{math.ceil(n / BATCH_SIZE) * seconds_per_batch / 60:.1f} min", flush=True)
 
     first_days_seen = None
+    failed = 0
     for start in range(0, n, BATCH_SIZE):
         t0 = time.monotonic()
         batch = points[start:start + BATCH_SIZE]
-        results = fetch_batch(batch)
-        if len(results) != len(batch):
-            raise RuntimeError(f"expected {len(batch)} results, got {len(results)}")
-        if first_days_seen is None and results:
-            tm = (results[0].get("hourly") or {}).get("time") or []
+        results = fetch_points(batch)
+        failed += sum(r is None for r in results)
+        first_ok = next((r for r in results if r), None)
+        if first_days_seen is None and first_ok:
+            tm = (first_ok.get("hourly") or {}).get("time") or []
             first_days_seen = sorted({ts[:10] for ts in tm})
             # Trust the API's calendar (it starts at 00:00 today, GMT)
             if first_days_seen:
                 days[:] = first_days_seen[:FORECAST_DAYS]
         for k, loc in enumerate(results):
+            if loc is None:
+                continue
             peaks = daily_peaks(loc, days)
             idx = start + k
             for t in POLLEN_TYPES:
@@ -160,6 +195,11 @@ def build_snapshot(step: float):
         if done < n:
             elapsed = time.monotonic() - t0
             time.sleep(max(0.0, seconds_per_batch - elapsed))
+
+    if failed:
+        print(f"Warning: {failed}/{n} grid points had no data and were left empty", flush=True)
+    if failed > n // 2:
+        raise RuntimeError("More than half of the grid failed; not storing this snapshot")
 
     return {
         "v": 1,
@@ -188,10 +228,33 @@ CREATE INDEX IF NOT EXISTS idx_pollen_snapshots_generated
 """
 
 
+# Query parameters some providers add for Prisma/pgbouncer that libpq rejects
+_NON_LIBPQ_PARAMS = {"pgbouncer", "connection_limit", "pool_timeout", "schema",
+                     "statement_cache_size", "socket_timeout"}
+
+
+def clean_dsn(dsn: str) -> str:
+    dsn = dsn.strip().strip('"').strip("'").strip()
+    if dsn.startswith("postgres://"):
+        dsn = "postgresql://" + dsn[len("postgres://"):]
+    parts = urllib.parse.urlsplit(dsn)
+    query = [(k, v) for k, v in urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+             if k not in _NON_LIBPQ_PARAMS]
+    return urllib.parse.urlunsplit(parts._replace(query=urllib.parse.urlencode(query)))
+
+
 def store_in_db(snapshot: dict, dsn: str):
     import psycopg2  # imported lazily so --no-db works without it
 
-    conn = psycopg2.connect(dsn, connect_timeout=15)
+    dsn = clean_dsn(dsn)
+    host = urllib.parse.urlsplit(dsn).hostname
+    print(f"Saving to database at {host} …", flush=True)
+    try:
+        conn = psycopg2.connect(dsn, connect_timeout=15)
+    except Exception as e:
+        raise SystemExit(f"Could not connect to the database ({host}): {e}\n"
+                         "Check the DATABASE_URL secret: it should be the same Neon "
+                         "connection string the Vercel site uses.") from None
     try:
         with conn, conn.cursor() as cur:
             cur.execute(DDL)
