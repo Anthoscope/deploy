@@ -63,7 +63,9 @@ def build_grid(step: float):
     nx = int(round((EAST - WEST) / step)) + 1
     ny = int(round((NORTH - SOUTH) / step)) + 1
     lons = [round(WEST + i * step, 4) for i in range(nx)]
-    lats = [round(SOUTH + j * step, 4) for j in range(ny)]
+    # The top row sits exactly on the CAMS domain edge (72°N), which Open-Meteo
+    # rejects with HTTP 400; sample it just inside the domain instead.
+    lats = [round(min(SOUTH + j * step, NORTH - 0.1), 4) for j in range(ny)]
     # row-major, south → north, west → east
     points = [(lat, lon) for lat in lats for lon in lons]
     return nx, ny, points
